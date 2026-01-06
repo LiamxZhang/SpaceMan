@@ -26,7 +26,7 @@ def setup_logger(name, level=logging.INFO):
     
     return logger
 
-class FrankaMerge(Manipulator):
+class SatelliteManipulator(Manipulator):
     def __init__(
         self,
         name="franka_merge",
@@ -38,20 +38,14 @@ class FrankaMerge(Manipulator):
             sensors=sensors,
             backends=backends
         )
-        self.logger = setup_logger(f"FrankaMerge.{name}")
+        self.logger = setup_logger(f"SatelliteManipulator.{name}")
         
         # Logging the robot information
         self.logger.info(f"Joint dof indexes: {self.motors_dof+self.fingers_dof}")
         self.logger.info(f"Joint qs indexes: {self.motors_qs+self.fingers_qs}")
         # self.logger.debug(f"Joints all: {self.joints_info}")
-
-        # Gripper control
-        self.config_gripper_joints = torch.tensor(self.params["gripper_revolute"])
         
-        self.finger_open = torch.tensor(self.params["finger_open"], dtype=self.datatype, device=self.device)*self.config_gripper_joints
-        self.finger_close = torch.tensor(self.params["finger_close"], dtype=self.datatype, device=self.device)*self.config_gripper_joints
-        self.gripper_state = self.params["finger_open"][0]  # 1 for hand open
-        self.logger.info("FrankaMerge robot initialization completed")
+        self.logger.info("SatelliteManipulator robot initialization completed")
 
     def initialize(self):
         """After the scene is built."""
@@ -117,7 +111,11 @@ class FrankaMerge(Manipulator):
         """
         try:         
             gripper_value = map_to_range(gripper_value, 0, 1, self.params["finger_close"][0], self.params["finger_open"][0])
-            self.logger.info(f"Gripper is set to gripper_value={gripper_value}")
+
+            gripper_value_current = self.get_gripper_value()
+
+            self.logger.info(f"Gripper current value={gripper_value_current}")
+            # self.logger.info(f"Gripper is set to gripper_value={gripper_value}")
             
             # Determine target finger state
             # finger_state = self.finger_open if gripper_open else self.finger_close
@@ -130,7 +128,7 @@ class FrankaMerge(Manipulator):
             self.robot.set_qpos(qpos=finger_state, qs_idx_local=self.fingers_qs)
             
             # Update current state
-            self.gripper_state = gripper_value
+            # self.gripper_state = gripper_value
             self.logger.info(f"Gripper control completed")
             return True
             

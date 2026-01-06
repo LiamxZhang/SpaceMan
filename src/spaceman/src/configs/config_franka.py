@@ -51,6 +51,7 @@ FRANKA_PARAMS = {
     ),
     "motor": 7,
     "finger": 9,
+    "gripper_revolute": [1, 1],
     "finger_open": [0.04, 0.04],
     "finger_close": [0.0, 0.0],
     "ik_params": IK_PARAMS,

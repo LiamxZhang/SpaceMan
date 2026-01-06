@@ -303,16 +303,7 @@ def quaternion_multiply(q1, q2):
     z = w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2
     w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
     
-    return torch.stack([x, y, z, w])
-
-# def map_to_range(x, x_close, x_open, new_close, new_open):
-#     x_bool = x_close<=x_open
-#     new_bool = new_close<=new_open
-#     if x_bool==new_bool:
-#         return new_close + (x-x_close)/(x_open-x_close)*(new_open-new_close)
-#     else:
-#         return new_open - (x-x_close)/(x_open-x_close)*(new_open-new_close)
-    
+    return torch.stack([x, y, z, w])  
 
 
 def map_to_range(x, x_close, x_open, new_close, new_open):
@@ -326,6 +317,41 @@ def map_to_range(x, x_close, x_open, new_close, new_open):
     new_close: 新区间的起始端点
     new_open: 新区间的结束端点
     """
+    if any(isinstance(v, torch.Tensor) for v in (x, x_close, x_open, new_close, new_open)):
+        ref = next(v for v in (x, x_close, x_open, new_close, new_open) if isinstance(v, torch.Tensor))
+        device = ref.device
+        dtype = ref.dtype
+
+        def to_tensor(v):
+            if isinstance(v, torch.Tensor):
+                return v.to(device=device, dtype=dtype)
+            return torch.tensor(v, device=device, dtype=dtype)
+
+        x_t = to_tensor(x)
+        x_close_t = to_tensor(x_close)
+        x_open_t = to_tensor(x_open)
+        new_close_t = to_tensor(new_close)
+        new_open_t = to_tensor(new_open)
+
+        x_min = torch.minimum(x_close_t, x_open_t)
+        x_max = torch.maximum(x_close_t, x_open_t)
+        out_of_range = (x_t < x_min) | (x_t > x_max)
+        try:
+            if out_of_range.any().item():
+                print(f"警告: x 不在原区间 [{x_close}, {x_open}] 内")
+        except Exception:
+            pass
+
+        original_range = x_open_t - x_close_t
+        new_range = new_open_t - new_close_t
+        eps = torch.tensor(1e-12, device=device, dtype=dtype)
+        is_zero = torch.abs(original_range) < eps
+        mid = (new_close_t + new_open_t) / 2.0
+
+        t = (x_open_t - x_t) / original_range
+        mapped = new_open_t - t * new_range
+        return torch.where(is_zero, mid, mapped)
+
     # 输入验证
     if not (min(x_close, x_open) <= x <= max(x_close, x_open)):
         # 可以选择返回边界值或抛出异常

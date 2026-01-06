@@ -49,8 +49,7 @@ class StarlinkManipulator(Node):
         
         # 使用定时器
         self.simulation_timer = self.create_timer(0.1, self.timer_callback)  # 10Hz
-        self.gripper = 1.0
-        self.gripper_value = -0.2
+        self.gripper_value = 1.0
         self.gripper_state = True
         self.joint_direction = [-1, 1, -1, 1, 1, 1] # 前三确定
 
@@ -63,8 +62,8 @@ class StarlinkManipulator(Node):
         from envs.genesis_env import GenesisSim
         self.gsim = GenesisSim()
 
-        from robots.merge import FrankaMerge
-        self.franka_merge = FrankaMerge(name="franka_merge",sensors=[],backends=[])
+        from robots.satellite_manipulator import SatelliteManipulator
+        self.franka_merge = SatelliteManipulator(name="franka_merge",sensors=[],backends=[])
         
         # try:
         #     self.gsim.scene.link_entities(self.satellite.robot, self.franka.robot, "attachment", "panda_link0")

@@ -12,7 +12,7 @@ sys.path.append(str(current_file_path.parent))
 from robots.robot import Robot
 from envs.genesis_env import GenesisSim
 from utils.twolink_state import TwoLinkState
-from utils.utils import convert_dict_to_tensors
+from utils.utils import convert_dict_to_tensors, map_to_range
 from controllers.smooth_IK_solver import SmoothIKSolver
 
 def setup_logger(name, level=logging.INFO):
@@ -55,7 +55,7 @@ class Manipulator(Robot):
         self.config = convert_dict_to_tensors(self.params["config"], self.datatype, self.device)
 
         # baselink_state = self._base_state.global_state
-        self.ee_state = TwoLinkState(device=self.device) # body state是相对于机械臂baselink
+        self.ee_state = TwoLinkState(device=self.device) # body state is relative to the baselink of robot arm
         
         ### controller
         self.joints_name = self.params["joints"]
@@ -68,10 +68,15 @@ class Manipulator(Robot):
         self.motors_dof = motors_dof_idx[:self.params["motor"]]
         self.fingers_dof = motors_dof_idx[self.params["motor"] : self.params["finger"]]
 
-        # 
-        self.finger_open = torch.tensor(self.params["finger_open"],dtype=self.datatype,device=self.device)
-        self.finger_close = torch.tensor(self.params["finger_close"],dtype=self.datatype,device=self.device)
-        self.gripper_state = self.params["finger_open"][0]  # 1 for hand open
+        # gripper controller
+        self.config_gripper_joints = torch.tensor(self.params["gripper_revolute"])
+
+        self.finger_open = torch.tensor(self.params["finger_open"][0], dtype=self.datatype, device=self.device) * self.config_gripper_joints
+        self.finger_close = torch.tensor(self.params["finger_close"][0], dtype=self.datatype, device=self.device) * self.config_gripper_joints
+
+        # gripper states
+        self.gripper_value = torch.tensor(self.params["finger_open"][0], dtype=self.datatype, device=self.device)  # absolute value for gripper
+        self.gripper_state = 1.0  # gripper state within range of [0, 1], and 1 for hand open
 
     """
     Properties
@@ -109,10 +114,11 @@ class Manipulator(Robot):
         """
         return self._robot_name
     
-
+ 
     """
     Operations
     """
+
     def initialize(self):
         """After the scene is built."""
         # Initialize Franka robot's configuration
@@ -264,17 +270,19 @@ class Manipulator(Robot):
                 self.logger.debug(f"Converted gripper_open to boolean: {gripper_open}")
             
             # Determine target finger state
-            finger_state = self.finger_open if gripper_open else self.finger_close
+            gripper_value_desired = self.finger_open if gripper_open else self.finger_close
             action = "opening" if gripper_open else "closing"
-            self.logger.info(f"Gripper {action} with finger state: {finger_state}")
+
+            gripper_value = self.get_gripper_value()
+            self.logger.info(f"Gripper {action} with finger state: {gripper_value}")
             # finger_force = np.array([1.0, 1.0]) if gripper_open else np.array([-1.0, -1.0])
             # Control the gripper
             # self.robot.control_dofs_position(finger_state, self.fingers_dof)
             # self.robot.control_dofs_force(finger_force, self.fingers_dof)
-            self.robot.set_qpos(finger_state, self.fingers_dof)
+            self.robot.set_qpos(gripper_value_desired, self.fingers_dof)
             
             # Update current state
-            self.gripper_state = gripper_open
+            # self.gripper_state = gripper_open
             self.logger.info(f"Gripper {action} completed successfully")
             return True
             
@@ -283,6 +291,35 @@ class Manipulator(Robot):
             error_msg = f"Failed to control gripper: {e}"
             self.logger.error(error_msg)
             return False
+
+    def get_gripper_value(self):
+        """Read current gripper joint position from the simulator.
+
+        This queries the robot's qpos for the finger joints (`self.fingers_qs`), then:
+        - updates `self.gripper_value` with the first finger qpos (torch scalar)
+        - updates `self.gripper_state` with a normalized value in [0, 1] (python float)
+
+        Returns:
+            torch.Tensor: Scalar tensor of the first finger qpos (absolute joint position).
+        """
+        if not hasattr(self, 'fingers_qs') or self.fingers_qs is None or len(self.fingers_qs) == 0:
+            raise ValueError("fingers_qs is empty; cannot read gripper qpos")
+
+        # qpos_fingers: torch.Tensor with shape (n_qs,) or (n_envs, n_qs)
+        qpos_fingers = self.robot.get_qpos(qs_idx_local=self.fingers_qs)
+        qpos_fingers = torch.as_tensor(qpos_fingers, device=self.device, dtype=self.datatype)
+        if qpos_fingers.numel() == 0:
+            raise ValueError("gripper qpos array is empty")
+
+        # Store absolute gripper joint position as a torch scalar
+        self.gripper_value = qpos_fingers[0, 0] if qpos_fingers.dim() == 2 else qpos_fingers.reshape(-1)[0]
+
+        # Normalize to [0, 1] using configured open/close endpoints
+        finger_close_0 = self.finger_close.reshape(-1)[0]
+        finger_open_0 = self.finger_open.reshape(-1)[0]
+        mapped = map_to_range(self.gripper_value, finger_close_0, finger_open_0, 0.0, 1.0)
+        self.gripper_state = float(mapped.detach().cpu().item()) if isinstance(mapped, torch.Tensor) else float(mapped)
+        return self.gripper_value
 
     def show_info(self):
         self.logger.info(f"End effector body state: {self.ee_state.link_child_in_parent}")

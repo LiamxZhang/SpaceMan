@@ -48,7 +48,10 @@ class GelloControl(Node):
 
         # 3. 创建 ROS2 发布者
         # 发布到指令 Topic，队列深度为 10
-        self.joint_pub = self.create_publisher(JointState, '/wx250s/joint_states', 10)
+        self.joint_pub = self.create_publisher(
+            JointState, 
+            '/wx250s/joint_states', 
+            10)
 
         # 4. 创建高频定时器
         timer_period = 1.0 / self.args.hz
