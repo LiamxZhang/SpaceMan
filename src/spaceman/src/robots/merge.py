@@ -33,39 +33,24 @@ class FrankaMerge(Manipulator):
         sensors=[],
         backends=[]
     ):
-        super(Manipulator, self).__init__(
+        super().__init__(
             name=name,
             sensors=sensors,
             backends=backends
         )
         self.logger = setup_logger(f"FrankaMerge.{name}")
-        # for joint in self.robot.joints:
-        #     self.logger.debug(joint.name)
-        self.franka_name = name
-        self._scene = GenesisSim().scene
         
-        self.end_effector = self.robot.get_link(self.params["end_effector"])
-        self.base = self.robot.get_link(self.params["base"])
-        
-        # Need to modify FRANKA_CONFIG for starlink_combine_qf_space_manipulator
-        self.config = convert_dict_to_tensors(self.params["config"], self.datatype, self.device)
+        # Logging the robot information
+        self.logger.info(f"Joint dof indexes: {self.motors_dof+self.fingers_dof}")
+        self.logger.info(f"Joint qs indexes: {self.motors_qs+self.fingers_qs}")
+        # self.logger.debug(f"Joints all: {self.joints_info}")
 
-        # self._base_state = SingleLinkState()
-        self.ee_state = TwoLinkState(device=self.device)
-        
-        self.joints_name = self.params["joints"]
-        
-        motors_dof_idx = [self.robot.get_joint(name).dofs_idx_local[0] for name in self.joints_name]
-        # self.logger.debug(f"关节索引: {motors_dof_idx}")
-
-        self.motors_dof = motors_dof_idx[:self.params["motor"]]
-        self.fingers_dof = motors_dof_idx[self.params["motor"] : self.params["finger"]]
-
-        self.config_gripper_joints = torch.tensor(self.params["gripper_waist"])
+        # Gripper control
+        self.config_gripper_joints = torch.tensor(self.params["gripper_revolute"])
         
         self.finger_open = torch.tensor(self.params["finger_open"], dtype=self.datatype, device=self.device)*self.config_gripper_joints
         self.finger_close = torch.tensor(self.params["finger_close"], dtype=self.datatype, device=self.device)*self.config_gripper_joints
-        self.gripper_state = self.params["finger_open"][0]  # True for hand open
+        self.gripper_state = self.params["finger_open"][0]  # 1 for hand open
         self.logger.info("FrankaMerge robot initialization completed")
 
     def initialize(self):
@@ -102,7 +87,7 @@ class FrankaMerge(Manipulator):
             joint_position = joint_position.unsqueeze(0)
 
         
-        # Ensure position has shape [3] and quat has shape [4]
+        # Ensure joint position has shape [6]
         if joint_position.shape[-1] != 6:
             error_msg = f"Joint_position should have shape [6], got {joint_position.shape}"
             self.logger.error(error_msg)
@@ -110,35 +95,29 @@ class FrankaMerge(Manipulator):
 
         # Control joints' dofs
         try:
-            self.robot.set_qpos(joint_position, self.motors_dof)
+            self.robot.set_qpos(qpos=joint_position, qs_idx_local=self.motors_qs)
             
             # Optional: Get feedback for verification
             qpos_fb = self.robot.get_qpos()
-            self.logger.debug(f"Current joint feedback position: {qpos_fb}")
+            self.logger.info(f"Current joint feedback position: {qpos_fb}")
             self.logger.info(f"Target joint position: {joint_position}")
-            
+            self.logger.info(f"joint index: {self.motors_qs}")
             return True
         
         except Exception as e:
             self.logger.error(f"Failed to set joint positions: {e}")
             return False
     
-    def control_gripper(self, gripper_open, gripper_value):
+    def control_gripper(self, gripper_value):
         """
         Control the gripper to open or close.
         Args:
-            gripper_open: bool or value that can be converted to bool
-                        True to open gripper, False to close
+            gripper_value: in range [0, 1]
+                        1 to open gripper, 0 to close
         """
-        try:
-            # Ensure input is boolean
-            if not isinstance(gripper_open, bool):
-                gripper_open = bool(gripper_open)
-                self.logger.debug(f"Converted gripper_open to boolean: {gripper_open}")
-            
-            action = "open" if gripper_open else "close"
+        try:         
             gripper_value = map_to_range(gripper_value, 0, 1, self.params["finger_close"][0], self.params["finger_open"][0])
-            self.logger.info(f"Controlling gripper {action}, gripper_value={gripper_value}")
+            self.logger.info(f"Gripper is set to gripper_value={gripper_value}")
             
             # Determine target finger state
             # finger_state = self.finger_open if gripper_open else self.finger_close
@@ -146,13 +125,13 @@ class FrankaMerge(Manipulator):
             self.logger.debug(finger_state)
             # finger_force = np.array([1.0, 1.0]) if gripper_open else np.array([-1.0, -1.0])
             # Control the gripper
-            # self.robot.control_dofs_position(finger_state, self.fingers_dof)
-            # self.robot.control_dofs_force(finger_force, self.fingers_dof)
-            self.robot.set_qpos(finger_state, self.fingers_dof)
+            # self.robot.control_dofs_position(finger_state, self.fingers_qs)
+            # self.robot.control_dofs_force(finger_force, self.fingers_qs)
+            self.robot.set_qpos(qpos=finger_state, qs_idx_local=self.fingers_qs)
             
             # Update current state
             self.gripper_state = gripper_value
-            self.logger.info(f"Gripper {action} control completed")
+            self.logger.info(f"Gripper control completed")
             return True
             
         except Exception as e:

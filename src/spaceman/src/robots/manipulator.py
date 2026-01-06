@@ -46,7 +46,7 @@ class Manipulator(Robot):
         self.logger = setup_logger(f"Franka.{name}")
         
         # Get the current world at which we want to spawn the Robot
-        self.franka_name = name
+        self.manipulator_name = name
         self._scene = GenesisSim().scene
         
         ### state
@@ -60,14 +60,18 @@ class Manipulator(Robot):
         ### controller
         self.joints_name = self.params["joints"]
 
-        motors_dof_idx = [self.robot.get_joint(name).dofs_idx_local[0] for name in self.joints_name]
+        motors_qs_idx = [self.robot.get_joint(name).q_start for name in self.joints_name]
+        self.motors_qs = motors_qs_idx[:self.params["motor"]]
+        self.fingers_qs = motors_qs_idx[self.params["motor"] : self.params["finger"]]
+
+        motors_dof_idx = [self.robot.get_joint(name).dof_start for name in self.joints_name]
         self.motors_dof = motors_dof_idx[:self.params["motor"]]
         self.fingers_dof = motors_dof_idx[self.params["motor"] : self.params["finger"]]
 
         # 
         self.finger_open = torch.tensor(self.params["finger_open"],dtype=self.datatype,device=self.device)
         self.finger_close = torch.tensor(self.params["finger_close"],dtype=self.datatype,device=self.device)
-        self.gripper_state = True # True for hand open. [TODO] update from genesis sim
+        self.gripper_state = self.params["finger_open"][0]  # 1 for hand open
 
     """
     Properties
@@ -145,9 +149,9 @@ class Manipulator(Robot):
         init  = to_list(config["initial_dofs"])
 
         dofs = self.motors_dof+self.fingers_dof
-
-        self.robot.set_dofs_kp(kp, dofs)
-        self.robot.set_dofs_kv(kv, dofs)
+        
+        self.robot.set_dofs_kp(kp, dofs_idx_local=dofs)
+        self.robot.set_dofs_kv(kv, dofs_idx_local=dofs)
         self.robot.set_dofs_force_range(frmin, frmax, dofs)
         self.robot.set_dofs_position(init, dofs)
         self.robot.set_dofs_velocity([0.0] * len(init), dofs)

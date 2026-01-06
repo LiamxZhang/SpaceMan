@@ -50,18 +50,20 @@ FRANKA_S_Q_PARAMS = {
         "qf_space_manipulator_Finger3_1_Link_roll",
         "qf_space_manipulator_Finger1_1_Link_roll", # the only positive mutiplier
         "qf_space_manipulator_Finger4_2_Link_roll",
-        "qf_space_manipulator_Finger4_1_Link_roll"
+        "qf_space_manipulator_Finger4_1_Link_roll",
     ),
     "motor": 6,
     "finger": 12,
-    "gripper_waist": [-1, 1, -1, 1, -1, -1],
-    "finger_open": [-0.2, -0.2, -0.2, -0.2, -0.2, -0.2],
-    "finger_close": [0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+    "gripper_revolute": [-1, 1, -1, 1, -1, -1],
+    # "finger_open": [-0.2, -0.2, -0.2, -0.2, -0.2, -0.2],
+    # "finger_close": [0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
+    "finger_open": [-0.5, -0.5, -0.5, -0.5, -0.5, -0.5],
+    "finger_close": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     "ik_params": IK_PARAMS,
 }
 
 FRANKA_S_Q_PID = {
-    "name": "franka_meerge",
+    "name": "franka_merge",
     "P": [1000, 1000, 1000, 1000, 0, 0],
     "I": [0, 0, 0, 0, 0, 0],
     "D": [1000, 1000, 1000, 100, 0, 0],

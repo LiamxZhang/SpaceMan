@@ -188,13 +188,13 @@ class StarlinkManipulator(Node):
                 pos * direction for pos, direction in zip(self.joint_positions, self.joint_direction)
             ]
 
-            self.log_joint_states()
+            # self.log_joint_states()
             self.get_gripper_state()
 
             # 提取位置信息并转换为 torch tensor
             joint_tensor = torch.tensor(self.joint_positions, dtype=self.datatype, device=self.device)
+            self.franka_merge.control_gripper(self.gripper_value)
             self.franka_merge.control_joint_pos(joint_tensor)
-            self.franka_merge.control_gripper(self.gripper, self.gripper_value)
         except Exception as e:
             self.get_logger().error(f"Joint state callback error: {e}")
 
@@ -216,7 +216,8 @@ class StarlinkManipulator(Node):
             #     self.gripper_state = False
             # elif not self.gripper_state and gripper_value >= 0.9:  # wx250s: >=-0.7
             #     self.gripper_state = True
-            self.gripper_value = map_to_range(gripper_value, -0.7, -1.37, 0.0, 1.0)
+            # self.gripper_value = map_to_range(gripper_value, -0.7, -1.37, 0.0, 1.0)
+            self.gripper_value = map_to_range(gripper_value, 0.0, 1.0, 0.0, 1.0)
         except Exception as e:
             error_msg = f"Error updating gripper state: {e}"
             if hasattr(self, 'get_logger'):

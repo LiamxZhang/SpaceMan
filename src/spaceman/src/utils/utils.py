@@ -305,10 +305,42 @@ def quaternion_multiply(q1, q2):
     
     return torch.stack([x, y, z, w])
 
+# def map_to_range(x, x_close, x_open, new_close, new_open):
+#     x_bool = x_close<=x_open
+#     new_bool = new_close<=new_open
+#     if x_bool==new_bool:
+#         return new_close + (x-x_close)/(x_open-x_close)*(new_open-new_close)
+#     else:
+#         return new_open - (x-x_close)/(x_open-x_close)*(new_open-new_close)
+    
+
+
 def map_to_range(x, x_close, x_open, new_close, new_open):
-    x_bool = x_close<=x_open
-    new_bool = new_close<=new_open
-    if x_bool==new_bool:
-        return new_close + (x-x_close)/(x_open-x_close)*(new_open-new_close)
-    else:
-        return new_open - (x-x_close)/(x_open-x_close)*(new_open-new_close)
+    """
+    将x从原区间[x_close, x_open]线性映射到新区间[new_close, new_open]
+    
+    参数:
+    x: 输入值（在原区间内）
+    x_close: 原区间的起始端点
+    x_open: 原区间的结束端点  
+    new_close: 新区间的起始端点
+    new_open: 新区间的结束端点
+    """
+    # 输入验证
+    if not (min(x_close, x_open) <= x <= max(x_close, x_open)):
+        # 可以选择返回边界值或抛出异常
+        print(f"警告: x={x} 不在原区间 [{x_close}, {x_open}] 内")
+
+    # 计算原区间和新区间的长度
+    original_range = x_open - x_close
+    new_range = new_open - new_close
+    
+    # 处理区间长度为0的特殊情况
+    if abs(original_range) < 1e-12:  # 浮点数容差
+        # 原区间是一个点，映射到新区间的中点或者根据需求处理
+        return (new_close + new_open) / 2.0
+    
+    # 核心映射公式：线性插值
+    # 这个公式适用于所有单调情况（递增或递减）
+    t = (x_open - x) / original_range  # t在[0, 1]范围内
+    return new_open - t * new_range

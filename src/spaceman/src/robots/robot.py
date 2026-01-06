@@ -140,6 +140,23 @@ class Robot:
         """
         return self._robot_name
     
+    @property
+    def joints_info(self):
+        """Retrieves the current state of all robot joints.
+        Returns:
+            JointsData: Information about each joint, typically including 
+                    name, dof_idx_local, qs_idx_local, and etc.
+        """
+        return self.robot.joints
+
+    @property
+    def links_info(self):
+        """Retrieves the current state of all robot links (rigid bodies).
+        Returns:
+            LinksData: Information about each link.
+        """
+        return self.robot.links
+
     """
     Operations
     """
