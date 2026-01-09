@@ -60,11 +60,11 @@ class Manipulator(Robot):
         ### controller
         self.joints_name = self.params["joints"]
 
-        motors_qs_idx = [self.robot.get_joint(name).q_start for name in self.joints_name]
+        motors_qs_idx = [self.robot.get_joint(name).qs_idx_local[0] for name in self.joints_name]
         self.motors_qs = motors_qs_idx[:self.params["motor"]]
         self.fingers_qs = motors_qs_idx[self.params["motor"] : self.params["finger"]]
 
-        motors_dof_idx = [self.robot.get_joint(name).dof_start for name in self.joints_name]
+        motors_dof_idx = [self.robot.get_joint(name).dofs_idx_local[0] for name in self.joints_name]
         self.motors_dof = motors_dof_idx[:self.params["motor"]]
         self.fingers_dof = motors_dof_idx[self.params["motor"] : self.params["finger"]]
 

@@ -43,9 +43,8 @@ class SatelliteManipulator(Manipulator):
         # Logging the robot information
         self.logger.info(f"Joint dof indexes: {self.motors_dof+self.fingers_dof}")
         self.logger.info(f"Joint qs indexes: {self.motors_qs+self.fingers_qs}")
-        # self.logger.debug(f"Joints all: {self.joints_info}")
+        self.logger.info(f"Joints all: {self.joints_info}")
         
-        self.logger.info("SatelliteManipulator robot initialization completed")
 
     def initialize(self):
         """After the scene is built."""
@@ -62,7 +61,8 @@ class SatelliteManipulator(Manipulator):
             smooth_factor=self.params["ik_params"]["smooth_factor"], 
             max_joint_change=self.params["ik_params"]["max_joint_change"],
         )
-        self.logger.info(f"IK solver initialization completed")
+        self.logger.info(f"SatelliteManipulator robot {self._robot_name} initialization completed")
+
 
     def control_joint_pos(self, joint_position):
         """
@@ -112,19 +112,15 @@ class SatelliteManipulator(Manipulator):
         try:         
             gripper_value = map_to_range(gripper_value, 0, 1, self.params["finger_close"][0], self.params["finger_open"][0])
 
-            gripper_value_current = self.get_gripper_value()
+            _ = self.get_gripper_value()
 
-            self.logger.info(f"Gripper current value={gripper_value_current}")
+            self.logger.info(f"Gripper current value={self.gripper_value}")
             # self.logger.info(f"Gripper is set to gripper_value={gripper_value}")
             
             # Determine target finger state
-            # finger_state = self.finger_open if gripper_open else self.finger_close
             finger_state = torch.tensor(gripper_value, dtype=self.datatype, device=self.device).expand(6)*self.config_gripper_joints
             self.logger.debug(finger_state)
-            # finger_force = np.array([1.0, 1.0]) if gripper_open else np.array([-1.0, -1.0])
             # Control the gripper
-            # self.robot.control_dofs_position(finger_state, self.fingers_qs)
-            # self.robot.control_dofs_force(finger_force, self.fingers_qs)
             self.robot.set_qpos(qpos=finger_state, qs_idx_local=self.fingers_qs)
             
             # Update current state

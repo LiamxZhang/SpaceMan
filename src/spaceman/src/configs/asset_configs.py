@@ -1,10 +1,12 @@
 from configs.config_satellite import *
 from configs.config_franka import *
+from configs.config_starlink import *
 from configs.config_starlink_manipulator import *
 
 _ASSET_FACTORIES = {
     "franka": _make_franka_urdf,
     "satellite": _make_satellite,
+    "starlink": _make_starlink,
     "satellite_part": _make_satellite_part,
     "franka_mjcf": _make_franka_mjcf,
     "franka_merge":_make_starlink_manipulator,
@@ -12,12 +14,14 @@ _ASSET_FACTORIES = {
 
 _ASSET_CONFIG_FACTORIES = {
     "satellite": SATELLITE_PARAMS,
+    "starlink": STARLINK_PARAMS,
     "franka": FRANKA_PARAMS,
     "franka_merge": FRANKA_S_Q_PARAMS,
 }
 
 _ASSET_PID_FACTORIES = {
     "satellite": SATELLITE_PID,
+    "starlink": STARLINK_PID,
     "franka": FRANKA_PID,
     "franka_merge": FRANKA_S_Q_PID,
 }

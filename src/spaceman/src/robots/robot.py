@@ -4,7 +4,6 @@ import torch
 import logging
 import genesis as gs
 import math
-import numpy as np
 
 # Extension APIs
 from pathlib import Path
@@ -116,8 +115,6 @@ class Robot:
             backend.initialize(self)
         self.logger.info("All backends initialized")
 
-        self.logger.info(f"Robot {name} initialization completed")
-
     """
     Properties
     """
@@ -161,11 +158,11 @@ class Robot:
     Operations
     """
     def initialize(self):
-        self.logger.debug("Robot initialize method called")
+        self.logger.debug(f"Robot {self._robot_name} initialization completed")
         return
     
     def step(self, dt: float = None):
-        self.logger.debug("Robot step method called")
+        self.logger.debug(f"Robot {self._robot_name} step method called")
                 
         self._update_state()
 
