@@ -1,4 +1,4 @@
-"""SpaceOperationTask: Combined simulation of a Starlink satellite bus and its onboard manipulator.
+"""RobotAssistedDockingTask: Combined simulation of a Starlink satellite bus and its onboard manipulator.
 
 This task runs inside the GenesisSim environment (no ROS2 dependency) and:
 - Adds a Starlink satellite URDF model to the scene.
@@ -24,9 +24,9 @@ from robots.satellite_manipulator import SatelliteManipulator
 from configs.asset_configs import get_asset, get_configs, get_pid
 
 
-class SpaceOperationTask(Task):
+class RobotAssistedDockingTask(Task):
     def __init__(self, config: Optional[dict] = None):
-        super().__init__(task_name="space_operation")
+        super().__init__(task_name="robot_assisted_docking")
         # Optional external config (not heavily used right now)
         self.user_config = config or {}
         # Hold references to spawned entities
@@ -53,7 +53,7 @@ class SpaceOperationTask(Task):
             self.starlink_manipulator.initialize()
 
             self.status = TaskStatus.RUNNING
-            self.logger.info(f"SpaceOperationTask initialized successfully")
+            self.logger.info(f"RobotAssistedDockingTask initialized successfully")
             return True
 
         except Exception as e:
@@ -111,10 +111,10 @@ class SpaceOperationTask(Task):
 
 
 def main():
-    """Test SpaceOperationTask: initialize, run a few steps, then clean up."""
-    print("=== SpaceOperationTask Test ===")
+    """Test RobotAssistedDockingTask: initialize, run a few steps, then clean up."""
+    print("=== RobotAssistedDockingTask Test ===")
     
-    task = SpaceOperationTask()
+    task = RobotAssistedDockingTask()
     
     # Initialize the task
     if not task.initialize():

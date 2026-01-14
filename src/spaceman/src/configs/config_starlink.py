@@ -43,7 +43,9 @@ def _make_starlink():
     return {
         "morph": gs.morphs.URDF(
             file=to_posix(_STARLINK_PATHS['urdf']),
-            scale=5e-1,
+            pos=(-2.0, 0.0, 0.5),
+            euler=(0.0, 0.0, 180.0),
+            scale=7e-1,
             merge_fixed_links=False,
             fixed=False,
         ),

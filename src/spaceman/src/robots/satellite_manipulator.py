@@ -43,7 +43,7 @@ class SatelliteManipulator(Manipulator):
         # Logging the robot information
         self.logger.info(f"Joint dof indexes: {self.motors_dof+self.fingers_dof}")
         self.logger.info(f"Joint qs indexes: {self.motors_qs+self.fingers_qs}")
-        self.logger.info(f"Joints all: {self.joints_info}")
+        # self.logger.info(f"Joints all: {self.joints_info}")
         
 
     def initialize(self):
