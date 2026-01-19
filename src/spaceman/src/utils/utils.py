@@ -159,32 +159,31 @@ def with_camera(cam_settings):
     
     return len(camera_keys) > 0
 
-def calculate_camera_pose(wrist_position, wrist_quaternion):
+def calculate_camera_pose(wrist_position, wrist_quaternion, 
+    pos_offset=torch.tensor([0.07, 0.0, -0.12],dtype=torch.float32), 
+    lookat_offset=torch.tensor([0.0, 0.0, 1.0],dtype=torch.float32),
+    up_offset=torch.tensor([1.0, 0.0, 0.0],dtype=torch.float32) ):
     """
     使用pos、lookat和up参数设置手腕相机位姿
     
     参数:
         wrist_position: torch.Tensor, 手腕位置 [x, y, z]
         wrist_quaternion: torch.Tensor, 手腕四元数 [qw, qx, qy, qz]
+        lookat_offset: list, 观察点偏移 [x, y, z]
+        pos_offset: list or None, 相机位置偏移 [x, y, z]
     """    
     # 计算相机的朝向方向（假设相机朝向手腕的z轴负方向）
     transform_matrix = as_transform_matrix(wrist_position, wrist_quaternion)
+    rotation_matrix = transform_matrix[:3, :3]  # 3x3旋转矩阵
     
-    # 提取坐标轴方向
-    # 旋转矩阵的列向量分别是x, y, z轴方向
-    x_axis = transform_matrix[:3, 0]  # 右方向
-    y_axis = transform_matrix[:3, 1]  # 上方向  
-    z_axis = transform_matrix[:3, 2]  # 前方向
+    # 相机位置：手腕位置 + 旋转后的偏移量
+    pos = wrist_position + torch.matmul(rotation_matrix, pos_offset)
     
-    # 设置相机参数
-    pos = wrist_position - z_axis * 0.12 + x_axis * 0.07 # 相机位置就是手腕位置
-    
-    # 看向点：沿着相机的前方向（z轴负方向是相机的观察方向）
-    # 在计算机图形学中，相机通常看向z轴负方向
-    lookat = wrist_position + z_axis * 1.0
+    # 观察点：手腕位置 + 旋转后的观察偏移量
+    lookat = wrist_position + torch.matmul(rotation_matrix, lookat_offset)
     
     # 上方向：使用手腕的y轴方向
-    up = x_axis
+    up = torch.matmul(rotation_matrix, up_offset)
 
     return pos, lookat, up
 

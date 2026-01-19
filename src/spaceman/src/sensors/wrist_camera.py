@@ -5,6 +5,7 @@
 import torch
 
 # Extension APIs
+import torch
 import sys
 from pathlib import Path
 current_file_path = Path(__file__).resolve().parent
@@ -19,9 +20,12 @@ WRIST_CAM_SETTINGS = {
         "pos": (-1, -1, -1),
         "lookat": (0, 0, 0),
         "fov": 70,
-        "GUI": True,
+        "GUI": True
     },
-    "end_effector_link": "panda_grasptarget", #"panda_hand",
+    "end_effector_link": "qf_space_manipulator_Upper_wrist_Link_2",#"panda_grasptarget", #"panda_hand",
+    "pos_offset": torch.tensor([-0.07, 0.0, 0.11], dtype=torch.float32),
+    "lookat_offset": torch.tensor([-0.1, -1.0, 0.0], dtype=torch.float32),
+    "up_offset": torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
 }
 
 class WristCamera(Backend):
@@ -71,8 +75,13 @@ class WristCamera(Backend):
         position = torch.tensor(position, dtype=self.datatype, device=self.device)
         quaternion = torch.tensor(quaternion, dtype=self.datatype, device=self.device)  
 
-        # 更改其camera到手腕
-        self.cam_pos,self.cam_lookat, self.cam_up = calculate_camera_pose(position, quaternion)
+        # 更改其camera到手腕，使用配置中的pos_offset和lookat_offset
+        self.cam_pos,self.cam_lookat, self.cam_up = calculate_camera_pose(
+            position, quaternion, 
+            WRIST_CAM_SETTINGS["pos_offset"], 
+            WRIST_CAM_SETTINGS["lookat_offset"],
+            WRIST_CAM_SETTINGS["up_offset"]
+        )
 
         self.cam.set_pose(pos=self.cam_pos,lookat=self.cam_lookat, up=self.cam_up)
         

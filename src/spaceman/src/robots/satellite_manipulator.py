@@ -8,23 +8,9 @@ current_file_path = Path(__file__).resolve().parent
 sys.path.append(str(current_file_path.parent))
 
 from robots.manipulator import Manipulator
-from envs.genesis_env import GenesisSim
-from utils.twolink_state import TwoLinkState
 from utils.utils import convert_dict_to_tensors,map_to_range
 from controllers.smooth_IK_solver import SmoothIKSolver
-
-def setup_logger(name, level=logging.INFO):
-    logger = logging.getLogger(name)
-    
-    if not logger.handlers:
-        logger.setLevel(level)
-
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        
-        logger.addHandler(console_handler)
-    
-    return logger
+from utils.setup_logger import setup_logger
 
 class SatelliteManipulator(Manipulator):
     def __init__(

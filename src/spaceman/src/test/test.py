@@ -48,11 +48,11 @@ def main():
     from controllers.keyboard_controller import KeyboardController
     controller = KeyboardController()
 
-    from sensors.wrist_camera import WristCamera
-    wrist_camera = WristCamera()
+    # from sensors.wrist_camera import WristCamera
+    # wrist_camera = WristCamera()
 
-    from robots.merge import FrankaMerge
-    franka_merge = FrankaMerge(name="franka_merge",sensors=[], backends=[])
+    from robots.satellite_manipulator import SatelliteManipulator
+    franka_merge = SatelliteManipulator(name="franka_merge",sensors=[], backends=[])
 
     from robots.manipulator import Manipulator
     # franka = Manipulator(name="franka",sensors=[], backends=[])
