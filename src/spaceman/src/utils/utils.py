@@ -160,18 +160,28 @@ def with_camera(cam_settings):
     return len(camera_keys) > 0
 
 def calculate_camera_pose(wrist_position, wrist_quaternion, 
-    pos_offset=torch.tensor([0.07, 0.0, -0.12],dtype=torch.float32), 
-    lookat_offset=torch.tensor([0.0, 0.0, 1.0],dtype=torch.float32),
-    up_offset=torch.tensor([1.0, 0.0, 0.0],dtype=torch.float32) ):
+                          pos_offset=[0.07, 0.0, -0.12], 
+                          lookat_offset=[0.0, 0.0, 1.0],
+                          up_offset=[1.0, 0.0, 0.0]):
     """
     使用pos、lookat和up参数设置手腕相机位姿
     
     参数:
         wrist_position: torch.Tensor, 手腕位置 [x, y, z]
         wrist_quaternion: torch.Tensor, 手腕四元数 [qw, qx, qy, qz]
-        lookat_offset: list, 观察点偏移 [x, y, z]
-        pos_offset: list or None, 相机位置偏移 [x, y, z]
-    """    
+        pos_offset: list or torch.Tensor, 相机位置偏移 [x, y, z]
+        lookat_offset: list or torch.Tensor, 观察点偏移 [x, y, z]
+        up_offset: list or torch.Tensor, 上方向偏移 [x, y, z]
+    """
+    # 确保所有张量在相同设备上
+    device = wrist_position.device
+    dtype = wrist_position.dtype
+    
+    # 转换为张量（如果还不是的话）
+    pos_offset = torch.tensor(pos_offset, dtype=dtype, device=device)
+    lookat_offset = torch.tensor(lookat_offset, dtype=dtype, device=device)
+    up_offset = torch.tensor(up_offset, dtype=dtype, device=device)
+    
     # 计算相机的朝向方向（假设相机朝向手腕的z轴负方向）
     transform_matrix = as_transform_matrix(wrist_position, wrist_quaternion)
     rotation_matrix = transform_matrix[:3, :3]  # 3x3旋转矩阵

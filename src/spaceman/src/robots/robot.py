@@ -11,6 +11,7 @@ current_file_path = Path(__file__).resolve().parent
 sys.path.append(str(current_file_path.parent))
 from envs.genesis_env import GenesisSim
 from configs.asset_configs import *
+from sensors.wrist_camera import WristCamera
 from controllers.backend import Backend
 from controllers.pid import PIDController
 from utils.singlelink_state import SingleLinkState
@@ -37,6 +38,7 @@ class Robot:
             asset = get_asset(name)
             self.params = get_configs(name)
             self.pid_params = get_pid(name)
+            self.wrist_camera_params = get_wrist_camera(name)
             self.robot = self._scene.add_entity(**asset)
             self.logger.info(f"Robot asset loaded and added to scene: {name}")
         except Exception as e:
@@ -48,8 +50,17 @@ class Robot:
             sensors = []
         elif not isinstance(sensors, list):
             sensors = [sensors]
-        # 根据机器人名称自动判断是否添加手腕相机
-        self._auto_add_sensors(sensors, name)
+
+        if self.wrist_camera_params["wrist_camera"]:
+            try:
+                wrist_cam = WristCamera(config=self.wrist_camera_params)
+                sensors.append(wrist_cam)
+                self.logger.info(f"Added wrist camera for robot: {self._robot_name}")
+                self.wrist_camera = wrist_cam
+            except ImportError as e:
+                self.logger.warning(f"Cannot import WristCamera: {e}")
+            except Exception as e:
+                self.logger.error(f"Failed to add wrist camera: {e}")
         self._sensors = sensors
 
         # 处理后端 - 确保是列表
@@ -264,54 +275,3 @@ class Robot:
 
         return vec
 
-    def _auto_add_sensors(self, sensors_list, robot_name):
-        """根据机器人名称自动添加传感器"""
-        # 定义不同机器人类型的默认传感器配置
-        robot_sensor_configs = {
-            "franka_merge": {
-                "wrist_camera": True,
-                "wrist_config": {
-                    "end_effector_link": "panda_grasptarget",
-                    "camera_config": {
-                        "res": (640, 480),
-                        "pos": (-1, -1, -1),
-                        "lookat": (0, 0, 0),
-                        "fov": 70,
-                        "GUI": True,
-                    }
-                }
-            },
-            "franka": {
-                "wrist_camera": True,
-                "wrist_config": {
-                    "end_effector_link": "panda_hand",
-                    "camera_config": {
-                        "res": (640, 480),
-                        "pos": (-1, -1, -1),
-                        "lookat": (0, 0, 0),
-                        "fov": 70,
-                        "GUI": True,
-                    }
-                }
-            },
-            "starlink": {
-                "wrist_camera": False,  # 默认不添加手腕相机
-            }
-            # 可以继续添加其他机器人配置
-        }
-        
-        # 获取当前机器人的传感器配置
-        config = robot_sensor_configs.get(robot_name, {})
-        
-        # 检查是否需要添加手腕相机
-        if config.get("wrist_camera", False):
-            try:
-                from sensors.wrist_camera import WristCamera
-                wrist_cam = WristCamera()
-                sensors_list.append(wrist_cam)
-                self.logger.info(f"Auto-added wrist camera for robot: {robot_name}")
-                self.wrist_camera = wrist_cam
-            except ImportError as e:
-                self.logger.warning(f"Cannot import WristCamera: {e}")
-            except Exception as e:
-                self.logger.error(f"Failed to add wrist camera: {e}")

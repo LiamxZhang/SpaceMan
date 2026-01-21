@@ -14,7 +14,8 @@ from envs.genesis_env import GenesisSim
 from utils.utils import calculate_camera_pose
 from controllers.backend import Backend
 
-WRIST_CAM_SETTINGS = {
+# 默认配置（向后兼容）
+DEFAULT_WRIST_CAM_SETTINGS = {
     "camera": {
         "res": (640, 480),
         "pos": (-1, -1, -1),
@@ -22,23 +23,36 @@ WRIST_CAM_SETTINGS = {
         "fov": 70,
         "GUI": True
     },
-    "end_effector_link": "qf_space_manipulator_Upper_wrist_Link_2",#"panda_grasptarget", #"panda_hand",
-    "pos_offset": torch.tensor([-0.07, 0.0, 0.11], dtype=torch.float32),
-    "lookat_offset": torch.tensor([-0.1, -1.0, 0.0], dtype=torch.float32),
+    "end_effector_link": "panda_grasptarget",
+    "pos_offset": torch.tensor([-0.08, 0.0, 0.12], dtype=torch.float32),
+    "lookat_offset": torch.tensor([0.05, -1.0, 0.0], dtype=torch.float32),
     "up_offset": torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
 }
 
 class WristCamera(Backend):
     """
+    可配置的腕部相机传感器
+    
+    Args:
+        config (dict, optional): 相机配置字典，包含以下键：
+            - camera: 相机基本参数 (res, pos, lookat, fov, GUI)
+            - end_effector_link: 末端执行器链接名称
+            - pos_offset: 相机位置偏移
+            - lookat_offset: 相机观察点偏移  
+            - up_offset: 相机上方向偏移
+        如果不提供 config，则使用默认配置
     """
-    def __init__(self):
+    def __init__(self, config=None):
+        # 使用传入的配置或默认配置
+        self.config = config if config is not None else DEFAULT_WRIST_CAM_SETTINGS
+        
         # Add wrist camera to the scene
         self._scene = GenesisSim().scene
         self.device = GenesisSim().device
         self.datatype = torch.float32
 
         # Use private attribute to avoid property conflict
-        self._cam = self._scene.add_camera(**WRIST_CAM_SETTINGS["camera"])
+        self._cam = self._scene.add_camera(**self.config["camera"])
         self._robot = None
         self.end_effector = None
         self.cam_pos = None
@@ -56,36 +70,45 @@ class WristCamera(Backend):
     @property
     def lookat(self):
         return self.cam_lookat
-    
+
     def initialize(self, robot=None):
         self._robot = robot
         
         # Access Genesis robot entity through Robot wrapper (robot.robot has get_link())
         if hasattr(robot, 'robot'):
             genesis_robot = robot.robot
-            self.end_effector = genesis_robot.get_link(WRIST_CAM_SETTINGS["end_effector_link"])
+            end_effector_link = self.config.get("end_effector_link", DEFAULT_WRIST_CAM_SETTINGS["end_effector_link"])
+            self.end_effector = genesis_robot.get_link(end_effector_link)
         else:
             raise AttributeError(f"Robot object {robot} does not have a 'robot' attribute containing the Genesis entity")
-        
+
     def step(self):
-        # self._step += 1
-        # 获得robot的手腕位置姿态
-        position=self.end_effector.get_pos()
-        quaternion=self.end_effector.get_quat() # [qw, qx, qy, qz]
-        position = torch.tensor(position, dtype=self.datatype, device=self.device)
-        quaternion = torch.tensor(quaternion, dtype=self.datatype, device=self.device)  
-
-        # 更改其camera到手腕，使用配置中的pos_offset和lookat_offset
-        self.cam_pos,self.cam_lookat, self.cam_up = calculate_camera_pose(
-            position, quaternion, 
-            WRIST_CAM_SETTINGS["pos_offset"], 
-            WRIST_CAM_SETTINGS["lookat_offset"],
-            WRIST_CAM_SETTINGS["up_offset"]
-        )
-
-        self.cam.set_pose(pos=self.cam_pos,lookat=self.cam_lookat, up=self.cam_up)
+        """更新相机位置并渲染图像"""
+        if self._robot is None:
+            raise RuntimeError("Camera not bound to robot. Call bind() first.")
         
-        # 返回image
+        # 获取机器人末端执行器位置和姿态
+        position = self.end_effector.get_pos()
+        quaternion = self.end_effector.get_quat()
+        
+        # 转换为张量
+        position = torch.tensor(position, dtype=self.datatype, device=self.device)
+        quaternion = torch.tensor(quaternion, dtype=self.datatype, device=self.device)
+        
+        # 使用配置中的偏移参数计算相机位姿
+        pos_offset = self.config.get("pos_offset", DEFAULT_WRIST_CAM_SETTINGS["pos_offset"])
+        lookat_offset = self.config.get("lookat_offset", DEFAULT_WRIST_CAM_SETTINGS["lookat_offset"])
+        up_offset = self.config.get("up_offset", DEFAULT_WRIST_CAM_SETTINGS["up_offset"])
+        
+        # 计算相机位姿
+        self.cam_pos, self.cam_lookat, self.cam_up = calculate_camera_pose(
+            position, quaternion, pos_offset, lookat_offset, up_offset
+        )
+        
+        # 更新相机位姿
+        self.cam.set_pose(pos=self.cam_pos, lookat=self.cam_lookat, up=self.cam_up)
+        
+        # 渲染图像
         rgb, *rest = self.cam.render(
             rgb=True,
             # depth        = True,

@@ -26,6 +26,13 @@ _ASSET_PID_FACTORIES = {
     "franka_merge": FRANKA_S_Q_PID,
 }
 
+_ASSET_WristCamera_FACTORIES = {
+    "satellite": SATELLITE_CAMERA,
+    "starlink": STARLINK_CAMERA,
+    "franka": FRANKA_CAMERA,
+    "franka_merge": FRANKA_S_Q_CAMERA,
+}
+
 def get_asset(name: str) -> dict:
     """Build asset dict lazily after gs.init()."""
     if name not in _ASSET_FACTORIES:
@@ -42,8 +49,14 @@ def get_pid(name: str) ->dict:
         raise KeyError(f"Unknown asset '{name}'. Available: {list(_ASSET_PID_FACTORIES)}")
     return _ASSET_PID_FACTORIES[name]
 
+def get_wrist_camera(name: str) ->dict:
+    if name not in _ASSET_WristCamera_FACTORIES:
+        raise KeyError(f"Unknown asset '{name}'. Available: {list(_ASSET_WristCamera_FACTORIES)}")
+    return _ASSET_WristCamera_FACTORIES[name]
+
 __all__ = [
     'get_asset',
     'get_configs',
     'get_pid',
+    'get_wrist_camera',
 ]

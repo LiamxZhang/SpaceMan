@@ -40,6 +40,11 @@ SATELLITE_PID = {
     ]
 }
 
+SATELLITE_CAMERA = {
+    "name": "starlink",
+    "wrist_camera": False,
+}
+
 def _make_satellite():
     return {
         "morph": gs.morphs.URDF(
@@ -71,6 +76,7 @@ def _make_satellite_part():
 __all__ = [
     'SATELLITE_PARAMS',
     'SATELLITE_PID',
+    'SATELLITE_CAMERA',
     '_make_satellite',
     '_make_satellite_part',
 ]

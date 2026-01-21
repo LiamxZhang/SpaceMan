@@ -39,6 +39,11 @@ STARLINK_PID = {
     ]
 }
 
+STARLINK_CAMERA = {
+    "name": "starlink",
+    "wrist_camera": False,
+}
+
 def _make_starlink():
     return {
         "morph": gs.morphs.URDF(
@@ -57,5 +62,6 @@ def _make_starlink():
 __all__ = [
     'STARLINK_PARAMS',
     'STARLINK_PID',
+    'STARLINK_CAMERA',
     '_make_starlink',
 ]

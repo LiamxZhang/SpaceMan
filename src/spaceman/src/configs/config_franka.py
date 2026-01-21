@@ -4,7 +4,7 @@ Configuration for franka URDF & XML model.
 import sys
 from pathlib import Path
 import genesis as gs
-
+import torch
 current_file_path = Path(__file__).resolve().parent
 sys.path.insert(0, str(current_file_path))
 
@@ -74,6 +74,22 @@ FRANKA_PID = {
     ]
 }
 
+FRANKA_CAMERA = {
+    "name": "franka",
+    "wrist_camera": True,
+    "camera": {
+        "res": (640, 480),
+        "pos": (-1, -1, -1),
+        "lookat": (0, 0, 0),
+        "fov": 70,
+        "GUI": True
+    },
+    "end_effector_link": "panda_grasptarget", # "panda_hand"
+    "pos_offset": torch.tensor([0.07, 0.0, -0.12], dtype=torch.float32),
+    "lookat_offset": torch.tensor([0.0, 0.0, -1.0], dtype=torch.float32),
+    "up_offset": torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32)
+}
+
 def _make_franka_urdf():
     return {
         "morph": gs.morphs.URDF(
@@ -102,6 +118,7 @@ def _make_franka_mjcf():
 __all__ = [
     'FRANKA_PARAMS',
     'FRANKA_PID',
+    'FRANKA_CAMERA',
     '_make_franka_urdf',
     '_make_franka_mjcf',
 ]

@@ -4,7 +4,7 @@ Configuration for starlink_combine_qf_space_manipulator URDF model.
 """
 from pathlib import Path
 import genesis as gs
-
+import torch
 to_posix = lambda p: p.as_posix()
 
 _current_file_path = Path(__file__).resolve().parent
@@ -79,6 +79,22 @@ FRANKA_S_Q_PID = {
     ]
 }
 
+FRANKA_S_Q_CAMERA = {
+    "name": "franka",
+    "wrist_camera": True,
+    "camera": {
+        "res": (640, 480),
+        "pos": (-1, -1, -1),
+        "lookat": (0, 0, 0),
+        "fov": 70,
+        "GUI": True
+    },
+    "end_effector_link": "qf_space_manipulator_Upper_wrist_Link_2",
+    "pos_offset": torch.tensor([-0.08, 0.0, 0.12], dtype=torch.float32),
+    "lookat_offset": torch.tensor([0.05, -1.2, 0.06], dtype=torch.float32),
+    "up_offset": torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
+}
+
 def _make_starlink_manipulator():
     return {
         "morph": gs.morphs.URDF(
@@ -96,5 +112,6 @@ def _make_starlink_manipulator():
 __all__ = [
     'FRANKA_S_Q_PARAMS',
     'FRANKA_S_Q_PID',
+    'FRANKA_S_Q_CAMERA',
     '_make_starlink_manipulator',
 ]
