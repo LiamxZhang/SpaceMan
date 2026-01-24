@@ -12,6 +12,8 @@ import time
 import torch
 import genesis as gs
 from typing import Optional
+import cv2
+import numpy as np
 
 # Extension APIs
 from pathlib import Path
@@ -23,6 +25,7 @@ from robots.robot import Robot
 from robots.satellite_manipulator import SatelliteManipulator
 from configs.asset_configs import get_asset, get_configs, get_pid
 from utils.utils import map_to_range
+from utils.data_recorder import DataRecorder
 
 class RobotAssistedDockingTask(Task):
     def __init__(self, config: Optional[dict] = None):
@@ -33,9 +36,13 @@ class RobotAssistedDockingTask(Task):
         self.starlink: Optional[Robot] = None
         self.starlink_manipulator: Optional[SatelliteManipulator] = None
         
+        self.data_recorder = DataRecorder()
+        
         # Control interface attributes
-        self.joint_positions = None
+        self.joint_positions = [0.014, -1.766, 1.54, -0.026, 0.764, -0.003]
+        self.gripper = 0.9901
         self.gripper_value = 1.0
+        self.joint_direction = [-1.0, 1.0, -1.0, 1.0, 1.0, 1.0]
         self.current_setpoint = [1, 0, 0, -2, 0, 0]  # Default PID setpoint
 
     # ------------------------------------------------------------------
@@ -56,6 +63,7 @@ class RobotAssistedDockingTask(Task):
             self.gsim.start()
             self.starlink.initialize()
             self.starlink_manipulator.initialize()
+            self.data_recorder.initialize()
 
             self.status = TaskStatus.RUNNING
             self.logger.info(f"RobotAssistedDockingTask initialized successfully")
@@ -82,15 +90,65 @@ class RobotAssistedDockingTask(Task):
 
             # Compute total reward
             self.total_reward += self.reward().item() if isinstance(self.reward(), torch.Tensor) else self.reward()
+
+            sq_end_effector_pos=self.starlink_manipulator.robot.get_link(self.starlink_manipulator.params["end_effector"]).get_pos().cpu().numpy()
+            sq_end_effector_quat=self.starlink_manipulator.robot.get_link(self.starlink_manipulator.params["end_effector"]).get_quat().cpu().numpy()
+            sq_joint_positions=self.starlink_manipulator.robot.get_qpos(qs_idx_local=self.starlink_manipulator.motors_qs).cpu().numpy()
+            sq_base_pos=self.starlink_manipulator.robot.get_link(self.starlink_manipulator.params["base"]).get_pos().cpu().numpy()
+            sq_base_quat=self.starlink_manipulator.robot.get_link(self.starlink_manipulator.params["base"]).get_quat().cpu().numpy()
+            starlink_base_pos=self.starlink._base_state._global_state.position.cpu().numpy()
+            starlink_base_quat=self.starlink._base_state._global_state.quat.cpu().numpy()
+            sq_gripper_value = np.array([self.starlink_manipulator.gripper_value.cpu().numpy()])
+            # 获取相机图像
+            rgb_render = self.gsim.cam.render(rgb=True)
+            wrist_rgb_render = self.starlink_manipulator.wrist_camera.render(rgb=True)
+            
+            # 提取RGB图像（render可能返回多个值）
+            if isinstance(rgb_render, (list, tuple)):
+                rgb_image = rgb_render[0]
+            else:
+                rgb_image = rgb_render
+                
+            if isinstance(wrist_rgb_render, (list, tuple)):
+                wrist_rgb_image = wrist_rgb_render[0]
+            else:
+                wrist_rgb_image = wrist_rgb_render
+
+            rgb_resized = cv2.resize(rgb_image, (200, 200))
+            wrist_rgb_resized = cv2.resize(wrist_rgb_image, (84, 84))
+
+            self.data_recorder.record_actions(self.joint_positions, self.gripper)
+            self.data_recorder.record_robot_obs(
+                sq_end_effector_pos,
+                sq_end_effector_quat,
+                sq_gripper_value,
+                sq_joint_positions,
+                sq_base_pos,
+                sq_base_quat
+            )
+            self.data_recorder.record_scene_obs(
+                starlink_base_pos, 
+                starlink_base_quat
+            )
+            self.data_recorder.record_rgb_static(rgb_resized)
+            self.data_recorder.record_rgb_gripper(wrist_rgb_resized)
             
             # Terminate condition example
             if self.check_termination():
                 self.status = TaskStatus.COMPLETED
+                self.data_recorder.stop()
             return True
         except Exception as e:
-            self.logger.error(f"Step error: {e}")
-            self.status = TaskStatus.FAILED
-            return False
+            # Check if this is a viewer closure (normal stop) vs actual error
+            error_msg = str(e).lower()
+            if "viewer" in error_msg or "window" in error_msg or "closed" in error_msg:
+                self.logger.info("Viewer closed, stopping simulation")
+                self.status = TaskStatus.STOPPED  # Use STOPPED instead of FAILED for viewer closure
+                self.stop()
+            else:
+                self.logger.error(f"Step error: {e}")
+                self.status = TaskStatus.FAILED
+                return False
 
     def control(self, joints: list = None, pid_setpoint: list = None) -> bool:
         """
@@ -110,10 +168,11 @@ class RobotAssistedDockingTask(Task):
                 return False
             
             # Process joint positions
-            self.joint_positions = joints  # Take first 6 joints,已经切了前六个，且已经校准方向
-            
-            gripper_value = joints[6]
-            self.gripper_value = map_to_range(gripper_value, 0.0, 1.0, 0.0, 1.0)
+            self.joint_positions = joints[:6]  # Take first 6 joints,已经切了前六个，且已经校准方向
+            self.joint_positions = [pos * direction for pos, direction in zip(self.joint_positions, self.joint_direction)]
+
+            self.gripper = joints[6]
+            self.gripper_value = map_to_range(self.gripper, 0.0, 1.0, 0.0, 1.0)
             
             # Update PID setpoint if provided
             if pid_setpoint is not None:
@@ -154,7 +213,7 @@ class RobotAssistedDockingTask(Task):
     def stop(self) -> bool:
         """Stop task execution and clean up resources."""
         try:
-            if self.status not in [TaskStatus.RUNNING, TaskStatus.PAUSED]:
+            if self.status not in [TaskStatus.RUNNING, TaskStatus.STOPPED, TaskStatus.PAUSED]:
                 return False
                 
             # Stop simulation
@@ -181,6 +240,7 @@ class RobotAssistedDockingTask(Task):
                     self.logger.warning(f"Error stopping starlink: {e}")
             
             # Update status
+            self.data_recorder.stop()
             self.status = TaskStatus.CANCELLED
             self.logger.info(f"RobotAssistedDockingTask stopped successfully")
             return True
@@ -212,6 +272,8 @@ class RobotAssistedDockingTask(Task):
         """Very simple reward: always zero (placeholder)."""
         return torch.tensor(0.0, dtype=self.datatype, device=self.device)
 
+    def check_termination(self) -> bool:
+        return False
 
 def main():
     """Test RobotAssistedDockingTask: initialize, run a few steps, then clean up."""

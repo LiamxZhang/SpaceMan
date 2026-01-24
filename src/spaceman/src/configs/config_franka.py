@@ -59,6 +59,7 @@ FRANKA_PARAMS = {
 
 FRANKA_PID = {
     "name": "franka",
+    "enable_pid": False,  # 控制是否启用PID控制器
     "P": [100, 100, 100, 10, 10, 10],
     "I": [0, 0, 0, 0, 0, 0],
     "D": [0, 0, 0, 0, 0, 0],
@@ -84,6 +85,7 @@ FRANKA_CAMERA = {
         "fov": 70,
         "GUI": True
     },
+    "enable_recording": False,  # 控制是否启用录制的flag
     "end_effector_link": "panda_grasptarget", # "panda_hand"
     "pos_offset": torch.tensor([0.07, 0.0, -0.12], dtype=torch.float32),
     "lookat_offset": torch.tensor([0.0, 0.0, -1.0], dtype=torch.float32),

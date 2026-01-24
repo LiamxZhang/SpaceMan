@@ -25,9 +25,10 @@ SATELLITE_PARAMS = {
 
 SATELLITE_PID = {
     "name": "satellite",
-    "P": [100000, 10000, 10000, 100000, 0, 0],
+    "enable_pid": False,  # 控制是否启用PID控制器
+    "P": [0, 0, 0, 0, 0, 0],
     "I": [0, 0, 0, 0, 0, 0],
-    "D": [1000, 1000, 1000, 100, 0, 0],
+    "D": [0, 0, 0, 0, 0, 0],
     "setpoint": [1, 0, 0, -2, 0, 0],
     "dt": 0.01,
     "limits": [
@@ -43,6 +44,14 @@ SATELLITE_PID = {
 SATELLITE_CAMERA = {
     "name": "starlink",
     "wrist_camera": False,
+    "camera": {
+        "res": (640, 480),
+        "pos": (0.0, 0.0, 0.0),  # 将在机器人初始化时设置
+        "lookat": (0.0, 0.0, 0.0),  # 将在机器人初始化时设置
+        "fov": 40,
+        "GUI": False,
+    },
+    "enable_recording": False  # 控制是否启用录制的flag
 }
 
 def _make_satellite():
@@ -50,7 +59,7 @@ def _make_satellite():
         "morph": gs.morphs.URDF(
             file=to_posix(_SATELLITE_PATHS['urdf']),
             scale=5e-1,
-            merge_fixed_links=False,
+            # merge_fixed_links=False,
             fixed=False,
         ),
         "material": gs.materials.Rigid(

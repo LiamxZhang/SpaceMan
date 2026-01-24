@@ -48,8 +48,8 @@ class GenesisSim:
         self.datatype = torch.float32
         
         # Add third-person view (TPV) camera
-        if with_camera(TPV_CAM_SETTINGS):
-            self.cam = self.scene.add_camera(**TPV_CAM_SETTINGS["camera"])
+        # if with_camera(TPV_CAM_SETTINGS):
+        self.cam = self.scene.add_camera(**TPV_CAM_SETTINGS["camera"])
         
         # plane = self.scene.add_entity(
         #     gs.morphs.Plane(

@@ -157,7 +157,10 @@ def with_camera(cam_settings):
     camera_keys = [key for key in cam_settings.keys() 
                   if isinstance(key, str) and key.startswith("camera")]
     
-    return len(camera_keys) > 0
+    # Check if recording is enabled
+    recording_enabled = cam_settings.get("enable_recording", True)
+    
+    return len(camera_keys) > 0 and recording_enabled
 
 def calculate_camera_pose(wrist_position, wrist_quaternion, 
                           pos_offset=[0.07, 0.0, -0.12], 
@@ -379,3 +382,19 @@ def map_to_range(x, x_close, x_open, new_close, new_open):
     # 这个公式适用于所有单调情况（递增或递减）
     t = (x_open - x) / original_range  # t在[0, 1]范围内
     return new_open - t * new_range
+
+def quat_to_euler(quat):
+    """
+    将四元数转换为欧拉角 (使用scipy标准库)
+    
+    Args:
+        quat: 四元数 (4,) - [qx, qy, qz, qw]
+        
+    Returns:
+        tuple: (roll, pitch, yaw)
+    """
+    from scipy.spatial.transform import Rotation
+    # scipy使用 [x, y, z, w] 格式
+    rotation = Rotation.from_quat(quat)
+    euler = rotation.as_euler('xyz', degrees=False)
+    return euler[0], euler[1], euler[2]

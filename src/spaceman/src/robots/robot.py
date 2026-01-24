@@ -12,11 +12,11 @@ sys.path.append(str(current_file_path.parent))
 from envs.genesis_env import GenesisSim
 from configs.asset_configs import *
 from sensors.wrist_camera import WristCamera
-from controllers.backend import Backend
+from controllers.backend import EmptyBackend, Backend
 from controllers.pid import PIDController
 from utils.singlelink_state import SingleLinkState
 from utils.setup_logger import setup_logger
-
+from utils.utils import generate_filename
 class Robot:
     def __init__(
         self,
@@ -32,7 +32,9 @@ class Robot:
         self._scene = GenesisSim().scene
         self.device = GenesisSim().device
         self.datatype = GenesisSim().datatype
-        
+        # Initialize the base's position and orientation
+        self._base_state = SingleLinkState(device=self.device)
+           
         # entity, config = parse_asset_config(ASSETS, name)
         try:
             asset = get_asset(name)
@@ -56,7 +58,16 @@ class Robot:
                 wrist_cam = WristCamera(config=self.wrist_camera_params)
                 sensors.append(wrist_cam)
                 self.logger.info(f"Added wrist camera for robot: {self._robot_name}")
-                self.wrist_camera = wrist_cam
+                
+                # 添加腕部相机到场景
+                camera_params = self.wrist_camera_params.get("camera", {})
+                if camera_params:
+                    self.wrist_camera = wrist_cam._cam
+                    self.wrist_camera_enable_recording = self.wrist_camera_params.get("enable_recording", False)
+                    self.logger.info(f"Wrist camera recording enabled: {self.wrist_camera_enable_recording}")
+                else:
+                    self.logger.warning("No camera parameters found for wrist camera")
+                    
             except ImportError as e:
                 self.logger.warning(f"Cannot import WristCamera: {e}")
             except Exception as e:
@@ -68,9 +79,10 @@ class Robot:
             backends = []
         elif not isinstance(backends, list):
             backends = [backends]
-            
+        
         # 如果没有提供后端，创建默认的PIDController
-        if not backends:
+        if not backends and self.pid_params.get("enable_pid", False):
+            self.pid_params["setpoint"] = torch.cat([self._base_state.position_global, self._base_state.orient_global])
             pid_controller = PIDController(
                 P=self.pid_params["P"],
                 I=self.pid_params["I"],
@@ -91,8 +103,7 @@ class Robot:
         self._links = []
         self._get_links()
 
-        # Initialize the base's position and orientation
-        self._base_state = SingleLinkState(device=self.device)
+
         self.logger.debug("Base state initialized")
 
         # --------------------------------------------------------------------
@@ -158,6 +169,14 @@ class Robot:
     """
     def initialize(self):
         self.logger.debug(f"Robot {self._robot_name} initialization completed")
+        print(self.joints_info)
+        print(self.links_info)
+        # 启动腕部相机录制（如果启用）
+        if hasattr(self, 'wrist_camera') and hasattr(self, 'wrist_camera_enable_recording'):
+            if self.wrist_camera_enable_recording:
+                self.wrist_camera.start_recording()
+                self.logger.info("Wrist camera recording started")
+        
         return
     
     def step(self, dt: float = None):
@@ -167,7 +186,7 @@ class Robot:
 
         for sensor in self._sensors:
             sensor.step()
-
+        
         for backend in self._backends:
             if hasattr(backend, 'update_state') and self._base_state:
                 backend.update_state(self._base_state.position_global, self._base_state.quat_global)
@@ -194,15 +213,30 @@ class Robot:
             force = control_output.get('position')
             torque = control_output.get('orientation')
             
-            if force is not None or torque is not None:
+            # 检查力和力矩是否非零
+            force_nonzero = force is not None and not torch.allclose(torch.tensor(force), torch.zeros_like(torch.tensor(force)))
+            torque_nonzero = torque is not None and not torch.allclose(torch.tensor(torque), torch.zeros_like(torch.tensor(torque)))
+            
+            if force_nonzero or torque_nonzero:
                 self.apply_force(force=force, torque=torque, link_name=link_name)
                 # print(force, torque)
 
     def stop(self):
         self.logger.info("Stopping robot sensors and backends")
         
+        # 停止腕部相机录制（如果启用）
+        if hasattr(self, 'wrist_camera') and hasattr(self, 'wrist_camera_enable_recording'):
+            if self.wrist_camera_enable_recording:
+                try:
+                    save_file = generate_filename(prefix=f"wrist_camera_{self._robot_name}", extension="mp4", folder_path="recordings")
+                    self.wrist_camera.stop_recording(save_to_filename=save_file, fps=60)
+                    self.logger.info(f"Wrist camera recording saved to: {save_file}")
+                except Exception as e:
+                    self.logger.error(f"Failed to stop wrist camera recording: {e}")
+        
         for sensor in self._sensors:
             sensor.stop()
+        
         for backend in self._backends:
             backend.stop()
             
