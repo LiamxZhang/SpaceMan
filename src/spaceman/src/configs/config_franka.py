@@ -55,6 +55,7 @@ FRANKA_PARAMS = {
     "finger_open": [0.04, 0.04],
     "finger_close": [0.0, 0.0],
     "ik_params": IK_PARAMS,
+    "path": _FRANKA_PATHS['urdf'],
 }
 
 FRANKA_PID = {

@@ -60,6 +60,7 @@ FRANKA_S_Q_PARAMS = {
     "finger_open": [-0.5, -0.5, -0.5, -0.5, -0.5, -0.5],
     "finger_close": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     "ik_params": IK_PARAMS,
+    "path": _STARLINK_MANIPULATOR_URDF,
 }
 
 FRANKA_S_Q_PID = {

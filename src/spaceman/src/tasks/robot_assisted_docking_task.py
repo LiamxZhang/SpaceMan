@@ -35,9 +35,11 @@ class RobotAssistedDockingTask(Task):
         # Hold references to spawned entities
         self.starlink: Optional[Robot] = None
         self.starlink_manipulator: Optional[SatelliteManipulator] = None
-        
+
         self.data_recorder = DataRecorder()
-        
+        self.scene_config = None
+        self.robot_config = None
+
         # Control interface attributes
         self.joint_positions = [0.014, -1.766, 1.54, -0.026, 0.764, -0.003]
         self.gripper = 0.9901
@@ -63,7 +65,25 @@ class RobotAssistedDockingTask(Task):
             self.gsim.start()
             self.starlink.initialize()
             self.starlink_manipulator.initialize()
-            self.data_recorder.initialize()
+
+            self.scene_config = {
+                "name" : "robot_assisted_docking_task",
+                "base_pos": self.starlink_manipulator.ee_state.link_parent_global_state.position.cpu().numpy(),
+                "base_ort": self.starlink_manipulator.ee_state.link_parent_global_state.orient.cpu().numpy(),
+                "joint_pos": self.starlink_manipulator.robot.get_qpos(qs_idx_local=self.starlink_manipulator.motors_qs).cpu().numpy()
+            }
+            self.robot_config = {
+                "name": "starlink",
+                "urdf_path": self.starlink.params["path"],
+                "ini_pos": self.starlink._base_state.global_state.position.cpu().numpy(),
+                "ini_ort": self.starlink._base_state.global_state.orient.cpu().numpy()
+            }
+            self.data_recorder.initialize(
+                static_camera_config=self.starlink_manipulator.static_camera_config,
+                gripper_camera_config=self.starlink_manipulator.wrist_camera_params,
+                scene_config=self.scene_config,
+                robot_config=self.robot_config
+            )
 
             self.status = TaskStatus.RUNNING
             self.logger.info(f"RobotAssistedDockingTask initialized successfully")

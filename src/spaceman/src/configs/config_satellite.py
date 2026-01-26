@@ -20,7 +20,8 @@ _SATELLITE_PATHS = {
 
 SATELLITE_PARAMS = {
     "name": "satellite",
-    "base": "base_link"
+    "base": "base_link",
+    "path": _SATELLITE_PATHS['urdf'],
 }
 
 SATELLITE_PID = {

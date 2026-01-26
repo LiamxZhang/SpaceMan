@@ -11,6 +11,7 @@ current_file_path = Path(__file__).resolve().parent
 sys.path.append(str(current_file_path.parent))
 from envs.genesis_env import GenesisSim
 from configs.asset_configs import *
+from configs.configs import TPV_CAM_SETTINGS
 from sensors.wrist_camera import WristCamera
 from controllers.backend import EmptyBackend, Backend
 from controllers.pid import PIDController
@@ -32,6 +33,7 @@ class Robot:
         self._scene = GenesisSim().scene
         self.device = GenesisSim().device
         self.datatype = GenesisSim().datatype
+        self.static_camera_config = TPV_CAM_SETTINGS["camera"]
         # Initialize the base's position and orientation
         self._base_state = SingleLinkState(device=self.device)
            

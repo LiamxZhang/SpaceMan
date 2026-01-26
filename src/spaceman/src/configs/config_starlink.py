@@ -19,7 +19,8 @@ _STARLINK_PATHS = {
 
 STARLINK_PARAMS = {
     "name": "starlink",
-    "base": "base"
+    "base": "base",
+    "path": _STARLINK_PATHS['urdf'],
 }
 
 STARLINK_PID = {

@@ -54,7 +54,7 @@ TPV_CAM_SETTINGS = {
         "fov": 40,
         "GUI": True,
     },
-    "enable_recording": True  # 控制是否启用录制的flag
+    "enable_recording": False  # 控制是否启用录制的flag
 }
 
 __all__ = [

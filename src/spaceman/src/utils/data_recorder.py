@@ -1,8 +1,8 @@
 import os
-import numpy as np
 import yaml
+import numpy as np
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, List, Any
 from scipy.spatial.transform import Rotation
 
 import sys
@@ -18,12 +18,14 @@ class DataRecorder:
     每个数据类型保存为独立文件，每次保存创建新文件夹
     """
     
-    def __init__(self, base_save_dir: str = "recordings", episode_id: Optional[str] = None):
+    def __init__(self, 
+             base_save_dir: str = "datasets", 
+             episode_id: Optional[str] = None):
         """
         初始化数据记录器
         
         Args:
-            base_save_dir: 基础保存目录 (SpaceMan/recordings)
+            base_save_dir: 基础保存目录 (SpaceMan/datasets)
             episode_id: episode标识符，如果为None则自动生成时间戳
         """
         self.base_save_dir = base_save_dir
@@ -32,6 +34,15 @@ class DataRecorder:
         # 创建本次保存的专用文件夹
         self.episode_dir = os.path.join(self.base_save_dir, f"episode_{self.episode_id}")
         os.makedirs(self.episode_dir, exist_ok=True)
+        
+        # 设置保存目录属性
+        self.save_dir = self.episode_dir
+        
+        # 初始化配置参数为None
+        self.static_camera_config = None
+        self.gripper_camera_config = None
+        self.scene_config = None
+        self.robot_config = None
 
         self.logger = setup_logger("DataRecorder")
         self.logger.info("Initializing DataRecorder")
@@ -46,8 +57,28 @@ class DataRecorder:
         # 计数器
         self.step_count = 0
         
-    def initialize(self) -> None:
+    def initialize(self, 
+               static_camera_config: Optional[Dict] = None,
+               gripper_camera_config: Optional[Dict] = None,
+               scene_config: Optional[Dict] = None,
+               robot_config: Optional[Dict] = None) -> None:
+        """
+        初始化数据记录器
+        
+        Args:
+            static_camera_config: 静态相机配置字典
+            gripper_camera_config: 夹爪相机配置字典
+            scene_config: 场景配置字典
+            robot_config: 机器人配置字典
+            env_config: 环境配置字典
+        """
         self.clear_buffer()
+        
+        # 存储配置参数
+        self.static_camera_config = static_camera_config
+        self.gripper_camera_config = gripper_camera_config
+        self.scene_config = scene_config
+        self.robot_config = robot_config
         
         self.file_paths = {
             'actions': os.path.join(self.episode_dir, 'actions.npz'),
@@ -125,7 +156,7 @@ class DataRecorder:
         
         # 组合成完整的robot_obs (19,)
         robot_obs = np.concatenate([
-            end_effector_pos,                    # (3,) [x, y, z]
+            end_effector_pos,                   # (3,) [x, y, z]
             [ee_roll, ee_pitch, ee_yaw],        # (3,) [roll, pitch, yaw]
             gripper_value,                      # (1,) [gripper]
             joint_positions,                    # (6,) [joint1, joint2, ..., joint6]
@@ -275,14 +306,42 @@ class DataRecorder:
         
         self.logger.info(f"Episode {self.episode_id} saved successfully with {len(saved_files)} files")
         
-        # # 生成YAML配置文件
-        # config_file = self._generate_config_file()
-        # if config_file:
-        #     saved_files['config'] = config_file
+        # 询问用户任务是否完成
+        task_success = self._ask_task_success()
+        
+        # 生成YAML配置文件
+        config_file = self._generate_config_file(task_success=task_success)
+        if config_file:
+            saved_files['configs'] = config_file
             
         return saved_files
     
-    def _generate_config_file(self) -> Optional[str]:
+    def _ask_task_success(self) -> bool:
+        """
+        Ask user if task was completed successfully
+        
+        Returns:
+            bool: Whether the task was successfully completed
+        """
+        while True:
+            try:
+                user_input = input("Task completed successfully? (T/F): ").strip().upper()
+                if user_input == 'T':
+                    self.logger.info("User confirmed task completed successfully")
+                    return True
+                elif user_input == 'F':
+                    self.logger.info("User confirmed task not completed")
+                    return False
+                else:
+                    print("Please enter 'T' or 'F'")
+            except KeyboardInterrupt:
+                self.logger.info("User interrupted input, defaulting to task not completed")
+                return False
+            except Exception as e:
+                self.logger.error(f"Input error: {e}")
+                return False
+    
+    def _generate_config_file(self, task_success: bool = False) -> Optional[str]:
         """
         生成episode的YAML配置文件
         
@@ -303,37 +362,40 @@ class DataRecorder:
             config = {
                 'cameras': {
                     'static': {
-                        '_target_': 'vr_env.camera.static_camera.StaticCamera',
+                        '_target_': 'spaceman.envs.genesis_env.GenesisSim',
                         'name': 'static',
-                        'fov': 10,
+                        'fov': self.static_camera_config['fov'],
                         'aspect': 1,
                         'nearval': 0.01,
                         'farval': 10,
                         'width': 200,
                         'height': 200,
-                        'look_at': [-0.026242351159453392, -0.0302329882979393, 0.3920000493526459],
-                        'look_from': [2.871459009488717, -2.166602199425597, 2.555159848480571],
-                        'up_vector': [0.4041403970338857, 0.22629790978217404, 0.8862616969685161]
+                        'look_at': list(self.static_camera_config['lookat']),
+                        'look_from': list(self.static_camera_config['pos']),
+                        # 'up_vector': [0.4041403970338857, 0.22629790978217404, 0.8862616969685161]
                     },
                     'gripper': {
-                        '_target_': 'vr_env.camera.gripper_camera.GripperCamera',
+                        '_target_': 'spaceman.envs.camera.gripper_camera.GripperCamera',
                         'name': 'gripper',
-                        'fov': 75,
+                        'fov': self.gripper_camera_config["camera"]["fov"],
                         'aspect': 1,
                         'nearval': 0.01,
                         'farval': 2,
                         'width': 84,
-                        'height': 84
+                        'height': 84,
+                        'look_at': self.gripper_camera_config['lookat_offset'].cpu().numpy().tolist() if hasattr(self.gripper_camera_config['lookat_offset'], 'cpu') else self.gripper_camera_config['lookat_offset'],
+                        'look_from': self.gripper_camera_config['pos_offset'].cpu().numpy().tolist() if hasattr(self.gripper_camera_config['pos_offset'], 'cpu') else self.gripper_camera_config['pos_offset'],
+                        'up_vector': self.gripper_camera_config['up_offset'].cpu().numpy().tolist() if hasattr(self.gripper_camera_config['up_offset'], 'cpu') else self.gripper_camera_config['up_offset'],
                     },
-                    'tactile': {
-                        '_target_': 'vr_env.camera.tactile_sensor.TactileSensor',
-                        'name': 'tactile',
-                        'width': 120,
-                        'height': 160,
-                        'digit_link_ids': [10, 12],
-                        'visualize_gui': False,
-                        'config_path': 'conf/digit_sensor/config_digit.yml'
-                    }
+                    # 'tactile': {
+                    #     '_target_': 'vr_env.camera.tactile_sensor.TactileSensor',
+                    #     'name': 'tactile',
+                    #     'width': 120,
+                    #     'height': 160,
+                    #     'digit_link_ids': [10, 12],
+                    #     'visualize_gui': False,
+                    #     'config_path': 'conf/digit_sensor/config_digit.yml'
+                    # }
                 },
                 'load_dir': self.save_dir + '/',
                 'data_path': 'data',
@@ -342,49 +404,46 @@ class DataRecorder:
                 'processes': 16,
                 'max_episode_frames': num_frames,
                 'save_body_infos': True,
-                'set_static_cam': False,
-                'env': {
-                    'cameras': '${cameras}',
-                    'show_gui': '${show_gui}',
-                    'use_vr': False
-                },
+                'set_static_cam': True,
+                # 'env': {
+                #     'cameras': '${cameras}',
+                #     'show_gui': '${show_gui}',
+                #     'use_vr': False
+                # },
                 'scene': {
                     '_target_': 'vr_env.scene.play_table_scene.PlayTableScene',
                     '_recursive_': False,
-                    'name': 'robot_assisted_docking_scene',
-                    'data_path': '${data_path}',
-                    'global_scaling': 0.8,
-                    'euler_obs': '${robot.euler_obs}',
-                    'robot_base_position': [-0.34, -0.46, 0.24],
-                    'robot_base_orientation': [0, 0, 0],
-                    'robot_initial_joint_positions': [
-                        -1.21779206, 1.03987646, 2.11978261, -2.34205014,
-                        -0.87015947, 1.64119353, 0.55344866
-                    ],
-                    'surfaces': {
-                        'table': [[0.0, -0.15, 0.46], [-0.35, -0.03, 0.46]],
-                        'slider_left': [[-0.32, 0.05, 0.46], [-0.16, 0.12, 0.46]],
-                        'slider_right': [[-0.05, 0.05, 0.46], [0.13, 0.12, 0.46]]
-                    },
+                    'name': self.scene_config['name'],
+                    # 'data_path': '${data_path}',
+                    # 'global_scaling': 0.8,
+                    # 'euler_obs': '${robot.euler_obs}',着
+                    'robot_base_position': self.scene_config["base_pos"].tolist(),
+                    'robot_base_orientation': self.scene_config["base_ort"].tolist(),
+                    'robot_initial_joint_positions': self.scene_config["joint_pos"].tolist(),
+                    # 'surfaces': {
+                    #     'table': [[0.0, -0.15, 0.46], [-0.35, -0.03, 0.46]],
+                    #     'slider_left': [[-0.32, 0.05, 0.46], [-0.16, 0.12, 0.46]],
+                    #     'slider_right': [[-0.05, 0.05, 0.46], [0.13, 0.12, 0.46]]
+                    # },
                     'objects': {
                         'movable_objects': {
-                            'starlink_satellite': {
-                                'file': 'starlink/urdf/starlink.urdf',
-                                'initial_pos': 'any',
-                                'initial_orn': 'any'
+                            self.robot_config["name"]: {
+                                'file': str(self.robot_config["urdf_path"]),
+                                'initial_pos': self.robot_config["ini_pos"].tolist(),
+                                'initial_orn': self.robot_config["ini_ort"].tolist()
                             },
-                            'docking_target': {
-                                'file': 'docking_target/urdf/docking_target.urdf',
-                                'initial_pos': 'any',
-                                'initial_orn': 'any'
-                            }
+                    #         'docking_target': {
+                    #             'file': 'docking_target/urdf/docking_target.urdf',
+                    #             'initial_pos': 'any',
+                    #             'initial_orn': 'any'
+                    #         }
                         }
                     }
                 },
                 'robot': {
-                    '_target_': 'spaceman.robots.satellite_manipulator.SatelliteManipulator',
-                    'name': 'franka_merge',
-                    'urdf_path': 'assets/urdf/franka_merge/urdf/franka_merge.urdf',
+                    '_target_': 'spaceman.robots.starlink.Robot',
+                    'name': self.robot_config["name"],
+                    'urdf_path': str(self.robot_config["urdf_path"]),
                     'euler_obs': True,
                     'gripper_obs': True,
                     'joint_pos_obs': True,
@@ -401,8 +460,9 @@ class DataRecorder:
                     'action_dim': action_dim,
                     'robot_obs_dim': robot_obs_dim,
                     'scene_obs_dim': scene_obs_dim,
-                    'rgb_static_shape': (num_frames, 200, 200, 3) if self.rgb_static else None,
-                    'rgb_gripper_shape': (num_frames, 84, 84, 3) if self.rgb_gripper else None,
+                    'rgb_static_shape': [num_frames, 200, 200, 3] if self.rgb_static else None,
+                    'rgb_gripper_shape': [num_frames, 84, 84, 3] if self.rgb_gripper else None,
+                    'success': task_success,
                     'timestamp': datetime.now().isoformat()
                 }
             }
