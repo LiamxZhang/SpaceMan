@@ -10,19 +10,7 @@ sys.path.append(str(current_file_path.parent))
 from envs.genesis_env import GenesisSim
 from configs.asset_configs import *
 from controllers.backend import Backend
-
-def setup_logger(name, level=logging.INFO):
-    logger = logging.getLogger(name)
-    
-    if not logger.handlers:
-        logger.setLevel(level)
-
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        
-        logger.addHandler(console_handler)
-    
-    return logger
+from utils.setup_logger import setup_logger
 
 class PIDController(Backend):  # 继承Backend
     def __init__(self, P, I, D, setpoint, dt=0.01, output_limits=None, name="pid"):

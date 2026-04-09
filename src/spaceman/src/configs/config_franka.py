@@ -4,7 +4,7 @@ Configuration for franka URDF & XML model.
 import sys
 from pathlib import Path
 import genesis as gs
-
+import torch
 current_file_path = Path(__file__).resolve().parent
 sys.path.insert(0, str(current_file_path))
 
@@ -55,10 +55,12 @@ FRANKA_PARAMS = {
     "finger_open": [0.04, 0.04],
     "finger_close": [0.0, 0.0],
     "ik_params": IK_PARAMS,
+    "path": _FRANKA_PATHS['urdf'],
 }
 
 FRANKA_PID = {
     "name": "franka",
+    "enable_pid": False,  # 控制是否启用PID控制器
     "P": [100, 100, 100, 10, 10, 10],
     "I": [0, 0, 0, 0, 0, 0],
     "D": [0, 0, 0, 0, 0, 0],
@@ -72,6 +74,23 @@ FRANKA_PID = {
         None,        # pitch
         None         # yaw
     ]
+}
+
+FRANKA_CAMERA = {
+    "name": "franka",
+    "wrist_camera": True,
+    "camera": {
+        "res": (640, 480),
+        "pos": (-1, -1, -1),
+        "lookat": (0, 0, 0),
+        "fov": 70,
+        "GUI": True
+    },
+    "enable_recording": False,  # 控制是否启用录制的flag
+    "end_effector_link": "panda_grasptarget", # "panda_hand"
+    "pos_offset": torch.tensor([0.07, 0.0, -0.12], dtype=torch.float32),
+    "lookat_offset": torch.tensor([0.0, 0.0, -1.0], dtype=torch.float32),
+    "up_offset": torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32)
 }
 
 def _make_franka_urdf():
@@ -102,6 +121,7 @@ def _make_franka_mjcf():
 __all__ = [
     'FRANKA_PARAMS',
     'FRANKA_PID',
+    'FRANKA_CAMERA',
     '_make_franka_urdf',
     '_make_franka_mjcf',
 ]

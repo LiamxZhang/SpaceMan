@@ -8,23 +8,9 @@ current_file_path = Path(__file__).resolve().parent
 sys.path.append(str(current_file_path.parent))
 
 from robots.manipulator import Manipulator
-from envs.genesis_env import GenesisSim
-from utils.twolink_state import TwoLinkState
 from utils.utils import convert_dict_to_tensors,map_to_range
 from controllers.smooth_IK_solver import SmoothIKSolver
-
-def setup_logger(name, level=logging.INFO):
-    logger = logging.getLogger(name)
-    
-    if not logger.handlers:
-        logger.setLevel(level)
-
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        
-        logger.addHandler(console_handler)
-    
-    return logger
+from utils.setup_logger import setup_logger
 
 class SatelliteManipulator(Manipulator):
     def __init__(
@@ -89,19 +75,22 @@ class SatelliteManipulator(Manipulator):
 
         # Control joints' dofs
         try:
-            self.robot.set_qpos(qpos=joint_position, qs_idx_local=self.motors_qs)
-            
+            # self.robot.set_dofs_position(position=joint_position, dofs_idx_local=self.motors_dof, zero_velocity=False) # 就是这个robot.set_qpos的问题
+            # self.robot.set_qpos(qpos=joint_position, qs_idx_local=self.motors_qs, zero_velocity=False)
+            self.robot.control_dofs_position(position=joint_position, dofs_idx_local=self.motors_dof) # control必须加物理引擎和刚度阻尼参数
+            self._scene.step()
+
             # Optional: Get feedback for verification
             qpos_fb = self.robot.get_qpos()
-            self.logger.info(f"Current joint feedback position: {qpos_fb}")
-            self.logger.info(f"Target joint position: {joint_position}")
-            self.logger.info(f"joint index: {self.motors_qs}")
+            self.logger.debug(f"Current joint feedback position: {qpos_fb}")
+            self.logger.debug(f"Target joint position: {joint_position}")
+            self.logger.debug(f"joint index: {self.motors_qs}")
             return True
         
         except Exception as e:
             self.logger.error(f"Failed to set joint positions: {e}")
             return False
-    
+
     def control_gripper(self, gripper_value):
         """
         Control the gripper to open or close.
@@ -112,20 +101,28 @@ class SatelliteManipulator(Manipulator):
         try:         
             gripper_value = map_to_range(gripper_value, 0, 1, self.params["finger_close"][0], self.params["finger_open"][0])
 
-            _ = self.get_gripper_value()
-
-            self.logger.info(f"Gripper current value={self.gripper_value}")
             # self.logger.info(f"Gripper is set to gripper_value={gripper_value}")
             
             # Determine target finger state
             finger_state = torch.tensor(gripper_value, dtype=self.datatype, device=self.device).expand(6)*self.config_gripper_joints
             self.logger.debug(finger_state)
+
             # Control the gripper
-            self.robot.set_qpos(qpos=finger_state, qs_idx_local=self.fingers_qs)
+            self.robot.control_dofs_position(position=finger_state, dofs_idx_local=self.fingers_dof)
+            self._scene.step()
+            # self.robot.set_qpos(qpos=finger_state, qs_idx_local=self.fingers_qs, zero_velocity=False)
+            # self.robot.set_dofs_position(joint_position=self.finger_state, dofs_idx_local=self.fingers_dof, zero_velocity=False)  #还有它的问题
             
+            _ = self.get_gripper_value()
+            self.logger.debug(f"\rGripper current value={self.gripper_value}")
+            
+            if self.gripper_value > self.params["finger_open"][0] and self.gripper_state == 1.0:
+                self.gripper_state = 0.0
+            elif self.gripper_value < self.params["finger_close"][0] and self.gripper_state == 0.0:
+                self.gripper_state = 1.0
             # Update current state
             # self.gripper_state = gripper_value
-            self.logger.info(f"Gripper control completed")
+            self.logger.debug(f"\rGripper control completed")
             return True
             
         except Exception as e:

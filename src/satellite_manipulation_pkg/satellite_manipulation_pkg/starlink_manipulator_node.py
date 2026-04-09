@@ -64,7 +64,7 @@ class StarlinkManipulator(Node):
 
         from robots.satellite_manipulator import SatelliteManipulator
         self.franka_merge = SatelliteManipulator(name="franka_merge",sensors=[],backends=[])
-        
+
         # try:
         #     self.gsim.scene.link_entities(self.satellite.robot, self.franka.robot, "attachment", "panda_link0")
         # except:
@@ -76,6 +76,7 @@ class StarlinkManipulator(Node):
         # simulation env start
         self.gsim.start()
         self.franka_merge.initialize()
+        # self.franka_merge.apply_force(force=[0,0,1000],link_name="starlink_base_star_link")
 
     def main_thread(self):
         """genesis simulation main loop"""
@@ -157,7 +158,6 @@ class StarlinkManipulator(Node):
         pose_msg.pose.orientation.y = float(quat_np[2])  # qy  
         pose_msg.pose.orientation.z = float(quat_np[3])  # qz
         
-        
         # 发布消息
         self.ee_state_pub.publish(pose_msg)
     
@@ -177,7 +177,7 @@ class StarlinkManipulator(Node):
         
         # 发布消息
         self.gripper_state_pub.publish(gripper_msg)
-    
+
     def joint_state_callback(self, msg):
         try:
             self.joint_names = msg.name

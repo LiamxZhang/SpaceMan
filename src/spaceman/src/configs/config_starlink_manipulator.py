@@ -4,7 +4,7 @@ Configuration for starlink_combine_qf_space_manipulator URDF model.
 """
 from pathlib import Path
 import genesis as gs
-
+import torch
 to_posix = lambda p: p.as_posix()
 
 _current_file_path = Path(__file__).resolve().parent
@@ -60,14 +60,16 @@ FRANKA_S_Q_PARAMS = {
     "finger_open": [-0.5, -0.5, -0.5, -0.5, -0.5, -0.5],
     "finger_close": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     "ik_params": IK_PARAMS,
+    "path": _STARLINK_MANIPULATOR_URDF,
 }
 
 FRANKA_S_Q_PID = {
     "name": "franka_merge",
+    "enable_pid": True,  # 控制是否启用PID控制器
     "P": [1000, 1000, 1000, 1000, 0, 0],
     "I": [0, 0, 0, 0, 0, 0],
     "D": [1000, 1000, 1000, 100, 0, 0],
-    "setpoint": [1, 0, 0, -2, 0, 0],
+    "setpoint": [0, 0, 0, 0, 0, 0],
     "dt": 0.01,
     "limits": [
         500,         # x
@@ -77,6 +79,23 @@ FRANKA_S_Q_PID = {
         None,        # pitch
         None         # yaw
     ]
+}
+
+FRANKA_S_Q_CAMERA = {
+    "name": "franka",
+    "wrist_camera": True,
+    "camera": {
+        "res": (640, 480),
+        "pos": (-1, -1, -1),
+        "lookat": (0, 0, 0),
+        "fov": 70,
+        "GUI": True
+    },
+    "enable_recording": False,  # 控制是否启用录制的flag
+    "end_effector_link": "qf_space_manipulator_2F-Body_Link",
+    "pos_offset": torch.tensor([0.07, 0.1, -0.1], dtype=torch.float32),
+    "lookat_offset": torch.tensor([0.1, -1.0, 0.0], dtype=torch.float32),
+    "up_offset": torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32)
 }
 
 def _make_starlink_manipulator():
@@ -96,5 +115,6 @@ def _make_starlink_manipulator():
 __all__ = [
     'FRANKA_S_Q_PARAMS',
     'FRANKA_S_Q_PID',
+    'FRANKA_S_Q_CAMERA',
     '_make_starlink_manipulator',
 ]

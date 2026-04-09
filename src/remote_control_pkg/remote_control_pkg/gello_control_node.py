@@ -50,7 +50,7 @@ class GelloControl(Node):
         # 发布到指令 Topic，队列深度为 10
         self.joint_pub = self.create_publisher(
             JointState, 
-            '/wx250s/joint_states', 
+            '/wx250s/joint_states', # 接收的机械臂名称
             10)
 
         # 4. 创建高频定时器

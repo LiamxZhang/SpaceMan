@@ -2,6 +2,17 @@
 
 from abc import ABC, abstractmethod
 
+class EmptyBackend:
+    def __init__(self):
+        pass
+    def initialize(self, robot):
+        pass
+    def step(self):
+        pass
+    def stop(self):
+        pass
+    def reset(self):
+        pass
 
 class Backend(ABC):
     """
