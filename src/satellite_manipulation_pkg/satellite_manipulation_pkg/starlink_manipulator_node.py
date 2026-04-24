@@ -62,7 +62,9 @@ class StarlinkManipulator(Node):
         from envs.genesis_env import GenesisSim
         self.gsim = GenesisSim()
 
+        from robots.robot import Robot
         from robots.satellite_manipulator import SatelliteManipulator
+        self.satellite1 = Robot(name="satellite1", sensors=[], backends=[])
         self.franka_merge = SatelliteManipulator(name="franka_merge",sensors=[],backends=[])
 
         # try:
@@ -75,6 +77,7 @@ class StarlinkManipulator(Node):
 
         # simulation env start
         self.gsim.start()
+        self.satellite1.initialize()
         self.franka_merge.initialize()
         # self.franka_merge.apply_force(force=[0,0,1000],link_name="starlink_base_star_link")
 
@@ -84,6 +87,7 @@ class StarlinkManipulator(Node):
         self.rate = self.create_rate(10, self.get_clock())  # 设置循环频率为1Hz
         while self.gsim.viewer.is_alive():
             #
+            self.satellite1.step()
             self.franka_merge.step()
             self.gsim.step()
 
@@ -106,6 +110,7 @@ class StarlinkManipulator(Node):
         # main
         try:
             # 执行模拟步进
+            self.satellite1.step()
             self.franka_merge.step()
             self.gsim.step()
             
