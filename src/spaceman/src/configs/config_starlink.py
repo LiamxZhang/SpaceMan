@@ -19,24 +19,39 @@ _STARLINK_PATHS = {
 
 STARLINK_PARAMS = {
     "name": "starlink",
-    "base": "base_star_link"
+    "base": "base",
+    "path": _STARLINK_PATHS['urdf'],
 }
 
 STARLINK_PID = {
     "name": "starlink",
-    "P": [100000, 10000, 10000, 100000, 0, 0],
+    "enable_pid": False,  # 控制是否启用PID控制器
+    "P": [0, 0, 0, 0, 0, 0],
     "I": [0, 0, 0, 0, 0, 0],
-    "D": [1000, 1000, 1000, 100, 0, 0],
-    "setpoint": [1, 0, 0, -2, 0, 0],
+    "D": [0, 0, 0, 0, 0, 0],
+    "setpoint": [0, 0, 0, 0, 0, 0],
     "dt": 0.01,
     "limits": [
-        None,         # x
+        None,        # x
         None,        # y
         None,        # z
         None,        # roll
         None,        # pitch
         None         # yaw
     ]
+}
+
+STARLINK_CAMERA = {
+    "name": "starlink",
+    "wrist_camera": False,
+    "camera": {
+        "res": (640, 480),
+        "pos": (0.0, 0.0, 0.0),  # 将在机器人初始化时设置
+        "lookat": (0.0, 0.0, 0.0),  # 将在机器人初始化时设置
+        "fov": 40,
+        "GUI": False,
+    },
+    "enable_recording": False  # 控制是否启用录制的flag
 }
 
 def _make_starlink():
@@ -46,7 +61,7 @@ def _make_starlink():
             pos=(-2.0, 0.0, 0.5),
             euler=(0.0, 0.0, 180.0),
             scale=7e-1,
-            merge_fixed_links=False,
+            # merge_fixed_links=False,
             fixed=False,
         ),
         "material": gs.materials.Rigid(
@@ -57,5 +72,6 @@ def _make_starlink():
 __all__ = [
     'STARLINK_PARAMS',
     'STARLINK_PID',
+    'STARLINK_CAMERA',
     '_make_starlink',
 ]

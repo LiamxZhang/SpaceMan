@@ -11,22 +11,12 @@ current_file_path = Path(__file__).resolve().parent
 sys.path.append(str(current_file_path.parent))
 from robots.robot import Robot
 from envs.genesis_env import GenesisSim
+from configs.asset_configs import get_pid
 from utils.twolink_state import TwoLinkState
 from utils.utils import convert_dict_to_tensors, map_to_range
 from controllers.smooth_IK_solver import SmoothIKSolver
-
-def setup_logger(name, level=logging.INFO):
-    logger = logging.getLogger(name)
-    
-    if not logger.handlers:
-        logger.setLevel(level)
-
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        
-        logger.addHandler(console_handler)
-    
-    return logger
+from controllers.pid import PIDController
+from utils.setup_logger import setup_logger
 
 class Manipulator(Robot):
     def __init__(
@@ -35,6 +25,37 @@ class Manipulator(Robot):
         sensors=[],
         backends=[]
     ):
+        self.device = GenesisSim().device
+        # baselink_state = self._base_state.global_state
+        self.ee_state = TwoLinkState(device=self.device) # body state is relative to the baselink of robot arm
+
+        # 在调用父类初始化之前，先处理backends
+        # 处理后端 - 确保是列表
+        if backends is None:
+            backends = []
+        elif not isinstance(backends, list):
+            backends = [backends]
+        
+        # 如果没有提供后端，创建默认的PIDController
+        if not backends:
+            manipulator_pid_params = get_pid(name)
+            
+            # 检查是否启用PID控制器
+            if manipulator_pid_params.get("enable_pid", False):
+                manipulator_pid_params["setpoint"] = torch.cat([self.ee_state.link_parent_global_state.position, self.ee_state.link_parent_global_state.orient])
+                
+                pid_controller = PIDController(
+                    P=manipulator_pid_params["P"],
+                    I=manipulator_pid_params["I"],
+                    D=manipulator_pid_params["D"],
+                    setpoint=manipulator_pid_params["setpoint"],
+                    dt=manipulator_pid_params["dt"],
+                    output_limits=manipulator_pid_params["limits"],
+                    name=f"{name}_pid"
+                )
+                backends = [pid_controller]
+        
+        # 现在backends已经有内容了，父类不会创建默认PID
         # Initialize the Robot object, and add robot to backends
         # Let FrankaMerge be able to have own posix
         super().__init__(
@@ -53,9 +74,6 @@ class Manipulator(Robot):
         self.end_effector = self.robot.get_link(self.params["end_effector"])
         self.base = self.robot.get_link(self.params["base"])
         self.config = convert_dict_to_tensors(self.params["config"], self.datatype, self.device)
-
-        # baselink_state = self._base_state.global_state
-        self.ee_state = TwoLinkState(device=self.device) # body state is relative to the baselink of robot arm
         
         ### controller
         self.joints_name = self.params["joints"]
@@ -136,7 +154,13 @@ class Manipulator(Robot):
             max_joint_change=self.params["ik_params"]["max_joint_change"],
         )
         self.logger.info("IK solver initialized")
-    
+        
+        # 启动腕部相机录制（如果启用）
+        if hasattr(self, 'wrist_camera') and hasattr(self, 'wrist_camera_enable_recording'):
+            if self.wrist_camera_enable_recording:
+                self.wrist_camera.start_recording()
+                self.logger.info("Wrist camera recording started")
+        
     def set_config(self, config):
         """
         Apply PD, limits, and initial DOF state
@@ -245,7 +269,8 @@ class Manipulator(Robot):
 
         # Control joints' dofs
         try:
-            self.robot.set_qpos(qpos[:-2], self.motors_dof)
+            self.robot.control_dofs_position(position=qpos[:-2], dofs_idx_local=self.motors_dof)
+            self._scene.step()
             
             # Optional: Get feedback for verification
             # qpos_fb = self.robot.get_qpos()
@@ -279,7 +304,8 @@ class Manipulator(Robot):
             # Control the gripper
             # self.robot.control_dofs_position(finger_state, self.fingers_dof)
             # self.robot.control_dofs_force(finger_force, self.fingers_dof)
-            self.robot.set_qpos(gripper_value_desired, self.fingers_dof)
+            self.robot.control_dofs_position(position=gripper_value_desired, dofs_idx_local=self.fingers_dof)
+            self._scene.step()
             
             # Update current state
             # self.gripper_state = gripper_open

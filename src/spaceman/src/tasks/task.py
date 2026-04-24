@@ -36,6 +36,7 @@ class TaskStatus(Enum):
     FAILED = "failed"
     SUCCEED = "succeed"
     CANCELLED = "cancelled"
+    STOPPED = "stopped"
 
 
 class Task(abc.ABC):

@@ -157,34 +157,46 @@ def with_camera(cam_settings):
     camera_keys = [key for key in cam_settings.keys() 
                   if isinstance(key, str) and key.startswith("camera")]
     
-    return len(camera_keys) > 0
+    # Check if recording is enabled
+    recording_enabled = cam_settings.get("enable_recording", True)
+    
+    return len(camera_keys) > 0 and recording_enabled
 
-def calculate_camera_pose(wrist_position, wrist_quaternion):
+def calculate_camera_pose(wrist_position, wrist_quaternion, 
+                          pos_offset=[0.07, 0.0, -0.12], 
+                          lookat_offset=[0.0, 0.0, 1.0],
+                          up_offset=[1.0, 0.0, 0.0]):
     """
     使用pos、lookat和up参数设置手腕相机位姿
     
     参数:
         wrist_position: torch.Tensor, 手腕位置 [x, y, z]
         wrist_quaternion: torch.Tensor, 手腕四元数 [qw, qx, qy, qz]
-    """    
+        pos_offset: list or torch.Tensor, 相机位置偏移 [x, y, z]
+        lookat_offset: list or torch.Tensor, 观察点偏移 [x, y, z]
+        up_offset: list or torch.Tensor, 上方向偏移 [x, y, z]
+    """
+    # 确保所有张量在相同设备上
+    device = wrist_position.device
+    dtype = wrist_position.dtype
+    
+    # 转换为张量（如果还不是的话）
+    pos_offset = torch.tensor(pos_offset, dtype=dtype, device=device)
+    lookat_offset = torch.tensor(lookat_offset, dtype=dtype, device=device)
+    up_offset = torch.tensor(up_offset, dtype=dtype, device=device)
+    
     # 计算相机的朝向方向（假设相机朝向手腕的z轴负方向）
     transform_matrix = as_transform_matrix(wrist_position, wrist_quaternion)
+    rotation_matrix = transform_matrix[:3, :3]  # 3x3旋转矩阵
     
-    # 提取坐标轴方向
-    # 旋转矩阵的列向量分别是x, y, z轴方向
-    x_axis = transform_matrix[:3, 0]  # 右方向
-    y_axis = transform_matrix[:3, 1]  # 上方向  
-    z_axis = transform_matrix[:3, 2]  # 前方向
+    # 相机位置：手腕位置 + 旋转后的偏移量
+    pos = wrist_position + torch.matmul(rotation_matrix, pos_offset)
     
-    # 设置相机参数
-    pos = wrist_position - z_axis * 0.12 + x_axis * 0.07 # 相机位置就是手腕位置
-    
-    # 看向点：沿着相机的前方向（z轴负方向是相机的观察方向）
-    # 在计算机图形学中，相机通常看向z轴负方向
-    lookat = wrist_position + z_axis * 1.0
+    # 观察点：手腕位置 + 旋转后的观察偏移量
+    lookat = wrist_position + torch.matmul(rotation_matrix, lookat_offset)
     
     # 上方向：使用手腕的y轴方向
-    up = x_axis
+    up = torch.matmul(rotation_matrix, up_offset)
 
     return pos, lookat, up
 
@@ -370,3 +382,19 @@ def map_to_range(x, x_close, x_open, new_close, new_open):
     # 这个公式适用于所有单调情况（递增或递减）
     t = (x_open - x) / original_range  # t在[0, 1]范围内
     return new_open - t * new_range
+
+def quat_to_euler(quat):
+    """
+    将四元数转换为欧拉角 (使用scipy标准库)
+    
+    Args:
+        quat: 四元数 (4,) - [qx, qy, qz, qw]
+        
+    Returns:
+        tuple: (roll, pitch, yaw)
+    """
+    from scipy.spatial.transform import Rotation
+    # scipy使用 [x, y, z, w] 格式
+    rotation = Rotation.from_quat(quat)
+    euler = rotation.as_euler('xyz', degrees=False)
+    return euler[0], euler[1], euler[2]
