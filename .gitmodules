@@ -1,0 +1,3 @@
+[submodule "src/spaceman"]
+	path = src/spaceman
+	url = git@github.com:LiamxZhang/spaceman_core.git
